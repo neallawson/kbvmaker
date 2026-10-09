@@ -90,6 +90,90 @@ func TestGeneratedImageAndShortRender(t *testing.T) {
 	}
 }
 
+func TestColorBackdropPixels(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip(err)
+	}
+	dir := t.TempDir()
+	if err := writePortrait(filepath.Join(dir, "photo.png"), 200, 400); err != nil {
+		t.Fatal(err)
+	}
+	body := `{
+	  "montage": 1,
+	  "canvas": {"width": 320, "height": 180, "backdrop": {"kind": "color", "color": "#0000FF"}},
+	  "output": {"width": 160, "height": 90, "fps": 10, "preset": "ultrafast", "crf": 30, "file": "out.mp4"},
+	  "audio": "tone.wav",
+	  "slots": [{"src": "photo.png", "mode": "hold"}]
+	}`
+	path := filepath.Join(dir, "piece.montage.json")
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSilenceWAV(filepath.Join(dir, "tone.wav"), 8000, 0.4); err != nil {
+		t.Fatal(err)
+	}
+	probe, err := media.NewFFProbe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := v1.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := v1.New(probe).Resolve(context.Background(), d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmds, err := v1.New(probe).Compile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "work"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var ran bool
+	for _, c := range cmds {
+		if c.Stage != "canvas" {
+			continue
+		}
+		cmd := exec.Command(c.Argv[0], c.Argv[1:]...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v: %s", err, out)
+		}
+		ran = true
+	}
+	if !ran {
+		t.Fatal("no canvas command")
+	}
+	f, err := os.Open(filepath.Join(dir, "work", "canvas-0.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	img, err := png.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.Bounds().Dx() != 320 || img.Bounds().Dy() != 180 {
+		t.Fatalf("canvas %v", img.Bounds())
+	}
+	br, bg, bb := rgb(img.At(0, 0))
+	if br > 5 || bg > 5 || bb < 250 {
+		t.Fatalf("bar pixel rgb(%d,%d,%d), want blue", br, bg, bb)
+	}
+	pr, pg, pb := rgb(img.At(160, 90))
+	if pr < 150 || pg > 80 || pb > 80 {
+		t.Fatalf("photo pixel rgb(%d,%d,%d), want the red portrait", pr, pg, pb)
+	}
+}
+
+func rgb(c color.Color) (r, g, b int) {
+	rr, gg, bb, _ := c.RGBA()
+	return int(rr >> 8), int(gg >> 8), int(bb >> 8)
+}
+
 func writePortrait(path string, w, h int) error {
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	c := color.RGBA{R: 180, G: 40, B: 40, A: 255}

@@ -63,6 +63,7 @@ contains the list file.
 | `width`, `height` | pixels |
 | `fps` | frames per second |
 | `blur` | Gaussian sigma at the canvas size |
+| `color` | `#RRGGBB` |
 | `crf` | encoder quality |
 | `audioBitrate` | bits per second |
 
@@ -100,13 +101,41 @@ when `pool` is present.
 ### 4.1 Canvas
 
 ```
-Canvas { width?: number, height?: number, blur?: number }
+Canvas { width?: number, height?: number, blur?: number, backdrop?: Backdrop }
+
+Backdrop {
+  kind: "blur" | "color" | "pattern" | "image"
+  blur?:  number
+  color?: string
+  name?:  string
+  src?:   string
+}
 ```
 
-Defaults: width `3840`, height `2160`, blur `40`.
+Defaults: width `3840`, height `2160`, and a `blur` backdrop with sigma `40`.
 
 Width and height are positive even integers. Each canvas side is greater than
 or equal to the matching output side.
+
+`backdrop` is the area the fitted photograph does not cover. `fill` remains
+the zoom that covers the frame. An omitted `backdrop` is `{ "kind": "blur",
+"blur": 40 }`. `canvas.blur` sets that sigma when `backdrop` is omitted.
+Setting both `blur` and `backdrop` is rejected.
+
+`kind` selects the bars:
+
+- `blur` cover-crops the same photograph and blurs it. `blur` defaults to
+  `40` and is `>= 0`. `color`, `name`, and `src` are rejected.
+- `color` is a flat color. `color` is required, `#RRGGBB`. The other fields
+  are rejected.
+- `pattern` is a shipped drawing. `name` is `grain` or `gradient`. `color`
+  defaults to `#000000`. `grain` is uniform noise on that color, strength
+  `20`, seed `1`. `gradient` runs from that color at the top to black at the
+  bottom, speed `0`, seed `1`. `blur` and `src` are rejected.
+- `image` cover-crops `src`, a path relative to the document. `blur` defaults
+  to `0`. `color` and `name` are rejected.
+
+A slot may set `backdrop`. An omitted slot backdrop uses the canvas backdrop.
 
 ### 4.2 Output
 
@@ -226,14 +255,15 @@ file does not carry.
 
 ```
 Slot {
-  src:      string
-  mode?:    string
-  motion?:  Segment[]
-  basedOn?: string
-  hold?:    number
-  join?:    Join
-  dur?:     number
-  until?:   TimePoint
+  src:       string
+  mode?:     string
+  motion?:   Segment[]
+  basedOn?:  string
+  hold?:     number
+  join?:     Join
+  dur?:      number
+  until?:    TimePoint
+  backdrop?: Backdrop
 }
 
 Segment {
@@ -512,15 +542,22 @@ if w/h >= W/H then fill = (w/h) / (W/H)
 else               fill = (W/H) / (w/h)
 ```
 
-The canvas still is built once per source path and reused for every slot
-that uses that path:
+The canvas still is built once per source path and effective backdrop, and
+reused for every slot with that pair. The sharp branch is always the slot's
+photograph, scaled to fit inside `W × H`, `setsar=1`, then centered on the
+backdrop. One frame is kept. The motion filter reads that still.
 
-1. Split the upright image into a sharp branch and a blur branch.
-2. Blur branch: scale to cover `W × H`, crop to `W × H`, Gaussian blur of
-   `canvas.blur`, `setsar=1`.
-3. Sharp branch: scale to fit inside `W × H`, `setsar=1`.
-4. Overlay the sharp branch centered on the blur branch.
-5. Keep one frame. The motion filter reads that still.
+The backdrop branch depends on `kind`:
+
+- `blur`: scale the same photograph to cover `W × H`, crop, Gaussian blur of
+  the backdrop sigma, `setsar=1`.
+- `color`: a solid frame of that size in the given color.
+- `pattern`: `grain` or `gradient`, drawn at `W × H` as specified on
+  `Backdrop`.
+- `image`: scale `src` to cover `W × H`, crop, then the optional blur.
+
+A sigma of `0` skips the blur filter. Display rotation on an `image`
+backdrop is ffmpeg's autorotate on that input.
 
 Let the fitted sharp rectangle be width `dw`, height `dh`, origin
 `(x0, y0)` inside the canvas.
@@ -609,7 +646,9 @@ opts out of the reveal check: the picture may stay at `fill` and only pan.
 
 Invocation flags may override the audio path, the output path, the join
 duration, the hold, the zoom span, the blur, the random seed, and the
-schedule policy. The flag wins over the document.
+schedule policy. The flag wins over the document. The blur flag sets the
+sigma of a `blur` backdrop, or of an `image` backdrop. It does not change a
+`color` or `pattern` backdrop.
 
 ## 12. Checks
 
@@ -732,7 +771,13 @@ is a new package, `neal/kbvmaker/v2`, which accepts `montage: 2`. Version 1
 stays able to load a version-1 document. The engine does not accept two
 document versions through one package.
 
-This version leaves the following to a later document, and a version-1
-engine rejects them by the unknown-key and unknown-value rules: transition
-types other than `fade`, easing other than `linear`, tempo maps, and motion
-whose source is a moving image rather than a still.
+Creative rotation and skew are not part of version 1. Metadata rotation is
+applied when the image is probed. A later Montage is where a user rotation
+or a skew would be added. Version 1 has no fields for them.
+
+This version currently accepts one join type, `fade`, and one ease,
+`linear`. Further join types may be added here before the format is treated
+as finished. A version-1 engine rejects, by the unknown-key and
+unknown-value rules: easing other than `linear`, tempo maps, creative
+rotation, skew, and motion whose source is a moving image rather than a
+still.

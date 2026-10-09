@@ -76,9 +76,10 @@ type rawDoc struct {
 }
 
 type rawCanvas struct {
-	Width  *float64 `json:"width"`
-	Height *float64 `json:"height"`
-	Blur   *float64 `json:"blur"`
+	Width    *float64  `json:"width"`
+	Height   *float64  `json:"height"`
+	Blur     *float64  `json:"blur"`
+	Backdrop *Backdrop `json:"backdrop"`
 }
 
 type rawOutput struct {
@@ -113,7 +114,7 @@ func (r rawDoc) document() (*Document, error) {
 		return nil, rule.E(0, "missing-field", "audio")
 	}
 	d.Audio = *r.Audio
-	d.Canvas = Canvas{Width: 3840, Height: 2160, Blur: 40}
+	d.Canvas = Canvas{Width: 3840, Height: 2160, Backdrop: blurBackdrop(40)}
 	if c := r.Canvas; c != nil {
 		if c.Width != nil {
 			n, err := evenPx(*c.Width, "canvas.width")
@@ -129,11 +130,27 @@ func (r rawDoc) document() (*Document, error) {
 			}
 			d.Canvas.Height = n
 		}
-		if c.Blur != nil {
+		if c.Blur != nil && c.Backdrop != nil {
+			return nil, rule.E(0, "unknown-field", "canvas sets blur and backdrop")
+		}
+		if c.Backdrop != nil {
+			if err := c.Backdrop.finish(0); err != nil {
+				return nil, err
+			}
+			d.Canvas.Backdrop = *c.Backdrop
+		} else if c.Blur != nil {
 			if *c.Blur < 0 {
 				return nil, rule.E(0, "bad-number", "blur %v", *c.Blur)
 			}
-			d.Canvas.Blur = *c.Blur
+			d.Canvas.Backdrop = blurBackdrop(*c.Blur)
+		}
+	}
+	for i := range r.Slots {
+		if r.Slots[i].Backdrop == nil {
+			continue
+		}
+		if err := r.Slots[i].Backdrop.finish(i + 1); err != nil {
+			return nil, err
 		}
 	}
 	d.Output = Output{
@@ -290,7 +307,11 @@ func ApplyOverrides(d *Document, o Override) {
 		d.Defaults.ZoomSpan = *o.ZoomSpan
 	}
 	if o.Blur != nil {
-		d.Canvas.Blur = *o.Blur
+		switch d.Canvas.Backdrop.Kind {
+		case "blur", "image":
+			v := *o.Blur
+			d.Canvas.Backdrop.Blur = &v
+		}
 	}
 	if o.Schedule != "" {
 		if d.Schedule == nil {

@@ -50,24 +50,26 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 	canvasOf := map[string]string{}
 	n := 0
 	for _, s := range p.Slots {
-		if _, ok := canvasOf[s.Src]; ok {
+		key := canvasKey(s)
+		if _, ok := canvasOf[key]; ok {
 			continue
 		}
 		path := fmt.Sprintf("work/canvas-%d.png", n)
-		canvasOf[s.Src] = path
+		canvasOf[key] = path
 		n++
-		cmds = append(cmds, Command{Stage: "canvas", Argv: []string{
-			opt.FFmpeg, "-y", "-i", s.Src,
-			"-filter_complex", canvasFilter(p.Canvas),
-			"-frames:v", "1", "-update", "1", path,
-		}})
+		args := []string{opt.FFmpeg, "-y", "-i", s.Src}
+		if s.Backdrop.Kind == "image" {
+			args = append(args, "-i", s.Backdrop.Src)
+		}
+		args = append(args, "-filter_complex", canvasFilter(p.Canvas, s.Backdrop), "-frames:v", "1", "-update", "1", path)
+		cmds = append(cmds, Command{Stage: "canvas", Argv: args})
 	}
 	clips := make([]string, len(p.Slots))
 	for i, s := range p.Slots {
 		clips[i] = fmt.Sprintf("work/clip-%03d.mp4", i)
 		cmds = append(cmds, Command{Stage: "clip", Argv: []string{
 			opt.FFmpeg, "-y", "-loop", "1", "-framerate", strconv.Itoa(p.Output.FPS),
-			"-i", canvasOf[s.Src],
+			"-i", canvasOf[canvasKey(s)],
 			"-vf", zoomFilter(s, p.Output),
 			"-t", num(s.ClipDur),
 			"-c:v", p.Output.VideoCodec, "-preset", p.Output.Preset, "-crf", num(p.Output.CRF),
@@ -111,13 +113,47 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 	return cmds, nil
 }
 
-func canvasFilter(c model.Canvas) string {
-	return fmt.Sprintf(
-		"[0:v]split[sharp][blur];"+
-			"[blur]scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d,gblur=sigma=%s,setsar=1[blurred];"+
-			"[sharp]scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,setsar=1[fitted];"+
-			"[blurred][fitted]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2",
-		c.Width, c.Height, c.Width, c.Height, num(c.Blur), c.Width, c.Height)
+func canvasKey(s model.Slot) string {
+	b := s.Backdrop
+	return s.Src + "\x00" + b.Kind + "\x00" + b.Color + "\x00" + b.Name + "\x00" + b.Src + "\x00" + num(b.Blur)
+}
+
+func canvasFilter(c model.Canvas, b model.Backdrop) string {
+	w, h := c.Width, c.Height
+	sharp := fmt.Sprintf("[0:v]scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,setsar=1[fitted]", w, h)
+	over := "[bg][fitted]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2"
+	switch b.Kind {
+	case "color":
+		return fmt.Sprintf("color=c=%s:s=%dx%d:d=1,setsar=1[bg];%s;%s", ffmpegColor(b.Color), w, h, sharp, over)
+	case "pattern":
+		if b.Name == "grain" {
+			return fmt.Sprintf("color=c=%s:s=%dx%d:d=1,noise=alls=20:allf=u:all_seed=1,setsar=1[bg];%s;%s",
+				ffmpegColor(b.Color), w, h, sharp, over)
+		}
+		return fmt.Sprintf("gradients=s=%dx%d:n=2:c0=%s:c1=0x000000:x0=0:y0=0:x1=0:y1=%d:type=linear:speed=0:seed=1:d=1,setsar=1[bg];%s;%s",
+			w, h, ffmpegColor(b.Color), h, sharp, over)
+	case "image":
+		bg := fmt.Sprintf("[1:v]scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d", w, h, w, h)
+		if b.Blur > 0 {
+			bg += ",gblur=sigma=" + num(b.Blur)
+		}
+		return bg + ",setsar=1[bg];" + sharp + ";" + over
+	default:
+		blur := fmt.Sprintf("[blur]scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d", w, h, w, h)
+		if b.Blur > 0 {
+			blur += ",gblur=sigma=" + num(b.Blur)
+		}
+		return "[0:v]split[sharp][blur];" + blur + ",setsar=1[blurred];" +
+			fmt.Sprintf("[sharp]scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,setsar=1[fitted];", w, h) +
+			"[blurred][fitted]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2"
+	}
+}
+
+func ffmpegColor(hex string) string {
+	if len(hex) == 7 && hex[0] == '#' {
+		return "0x" + hex[1:]
+	}
+	return "0x000000"
 }
 
 func zoomFilter(s model.Slot, out model.Output) string {

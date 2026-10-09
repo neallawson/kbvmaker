@@ -45,6 +45,9 @@ func (d *Document) Validate() error {
 	if d.Defaults.Ease != "linear" {
 		return rule.E(0, "unknown-field", "ease %q", d.Defaults.Ease)
 	}
+	if err := d.Canvas.Backdrop.finish(0); err != nil {
+		return err
+	}
 	switch d.Timing.Policy {
 	case "fit-audio", "fixed-clip", "explicit", "markers":
 	default:
@@ -214,6 +217,11 @@ func validateSlot(d *Document, s Slot, slot int) error {
 	}
 	for i := range s.Motion {
 		if err := validateSegment(s.Motion[i], slot); err != nil {
+			return err
+		}
+	}
+	if s.Backdrop != nil {
+		if err := s.Backdrop.finish(slot); err != nil {
 			return err
 		}
 	}

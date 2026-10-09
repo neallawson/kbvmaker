@@ -23,9 +23,9 @@ type Document struct {
 
 // Canvas is the working still.
 type Canvas struct {
-	Width  int     `json:"width"`
-	Height int     `json:"height"`
-	Blur   float64 `json:"blur"`
+	Width    int      `json:"width"`
+	Height   int      `json:"height"`
+	Backdrop Backdrop `json:"backdrop"`
 }
 
 // Output is the encoded movie.
@@ -92,14 +92,15 @@ type ModeDef struct {
 
 // Slot is one picture in the authored timeline.
 type Slot struct {
-	Src     string     `json:"src"`
-	Mode    string     `json:"mode,omitempty"`
-	Motion  []Segment  `json:"motion,omitempty"`
-	BasedOn string     `json:"basedOn,omitempty"`
-	Hold    *float64   `json:"hold,omitempty"`
-	Join    *Join      `json:"join,omitempty"`
-	Dur     *float64   `json:"dur,omitempty"`
-	Until   *TimePoint `json:"until,omitempty"`
+	Src      string     `json:"src"`
+	Mode     string     `json:"mode,omitempty"`
+	Motion   []Segment  `json:"motion,omitempty"`
+	BasedOn  string     `json:"basedOn,omitempty"`
+	Hold     *float64   `json:"hold,omitempty"`
+	Join     *Join      `json:"join,omitempty"`
+	Dur      *float64   `json:"dur,omitempty"`
+	Until    *TimePoint `json:"until,omitempty"`
+	Backdrop *Backdrop  `json:"backdrop,omitempty"`
 }
 
 // HoldOr returns the slot hold, or def when the slot does not set one.

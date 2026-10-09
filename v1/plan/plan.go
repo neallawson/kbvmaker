@@ -69,7 +69,10 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 		Dir:        d.Dir,
 		Audio:      d.Audio,
 		OutputFile: outFile,
-		Canvas:     model.Canvas{Width: d.Canvas.Width, Height: d.Canvas.Height, Blur: d.Canvas.Blur},
+		Canvas: model.Canvas{
+			Width: d.Canvas.Width, Height: d.Canvas.Height,
+			Backdrop: modelBackdrop(d.Canvas.Backdrop),
+		},
 		Output: model.Output{
 			Width: d.Output.Width, Height: d.Output.Height, FPS: d.Output.FPS,
 			VideoCodec: d.Output.VideoCodec, CRF: d.Output.CRF, Preset: d.Output.Preset,
@@ -113,17 +116,65 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 				far = sp.Z1
 			}
 		}
+		bars := d.Canvas.Backdrop
+		if s.Backdrop != nil {
+			bars = *s.Backdrop
+		}
+		if bars.Kind == "image" {
+			back := doc.ResolvePath(d.Dir, bars.Src)
+			if err := exists(back); err != nil {
+				return nil, rule.E(i+1, "missing-media", "backdrop %s", bars.Src)
+			}
+		}
 		p.Slots = append(p.Slots, model.Slot{
 			Index: i + 1, Src: s.Src, Mode: mode, BasedOn: basedOn, Family: family,
 			ClipStart: w.ClipStart, ClipDur: w.ClipDur,
 			OpaqueStart: w.OpaqueStart, OpaqueEnd: w.OpaqueEnd,
-			Fill: fill, FarZoom: far, Join: w.Join, Spans: spans, Fit: fit,
+			Fill: fill, Backdrop: modelBackdrop(bars), FarZoom: far, Join: w.Join, Spans: spans, Fit: fit,
 		})
+	}
+	if err := requireBackdropFilters(ctx, probe, p); err != nil {
+		return nil, err
 	}
 	if err := check.All(p); err != nil {
 		return nil, err
 	}
 	return p, nil
+}
+
+func modelBackdrop(b doc.Backdrop) model.Backdrop {
+	return model.Backdrop{Kind: b.Kind, Blur: b.Sigma(), Color: b.Color, Name: b.Name, Src: b.Src}
+}
+
+func requireBackdropFilters(ctx context.Context, probe media.Probe, p *model.Plan) error {
+	need := map[string]bool{}
+	for _, s := range p.Slots {
+		switch s.Backdrop.Kind {
+		case "color":
+			need["color"] = true
+		case "pattern":
+			if s.Backdrop.Name == "grain" {
+				need["color"] = true
+				need["noise"] = true
+			}
+			if s.Backdrop.Name == "gradient" {
+				need["gradients"] = true
+			}
+		}
+	}
+	if len(need) == 0 {
+		return nil
+	}
+	have, err := probe.Filters(ctx)
+	if err != nil {
+		return err
+	}
+	for name := range need {
+		if !have[name] {
+			return rule.E(0, "missing-media", "ffmpeg has no %s filter", name)
+		}
+	}
+	return nil
 }
 
 func requireFilters(ctx context.Context, probe media.Probe) error {

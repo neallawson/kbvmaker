@@ -737,3 +737,288 @@ zoom `1`, each check code, and golden argv. One test loads a document
 through a fake probe and checks that both exports carry the compiler's argv.
 One test, skipped when ffmpeg is absent, writes a PNG and a WAV, renders a
 short `hold`, and checks the output dimensions and duration with ffprobe.
+
+## Front end
+
+The window edits a Montage document and previews the plan. It does not keep
+a second recipe. Load, tweak, and render all read and write `montage: 1`.
+The engine still resolves time, zoom, and pan. The window shows the result.
+
+Montage 1 is not locked. The repository is private and the app is still
+changing. The specification describes what the engine does today. This
+section is what version 1 is expected to include before anyone treats the
+format as finished. New fields land in `montage-v1.md` when they are built.
+Until then the spec wins for the code, and these notes win for what we are
+willing to add.
+
+Two ways through the same file.
+
+The short path loads images, loads the soundtrack, leaves the suggested
+look selected, and renders. That writes a complete document: slots in the
+order the images were loaded, a plain move on each slot, a fill, a dissolve,
+and a timing policy. A person who never opens a picture still gets a video.
+
+The long path starts from that file. Reorder the filmstrip. Pick a different
+look, a different fill, or a different move between pictures. Open one
+picture only when that one picture should differ. Save a combination that
+worked under a name. The file on disk is the edit, not a pointer back at the
+preset that started it.
+
+### Keeping it simple
+
+Most people using this will not know what a zoom span, an opaque range, or a
+reveal is, and a screen full of those controls will lose them. The short
+path has to be: add the pictures, add the song, render.
+
+Every choice they see is a preset with a plain name. The engine's names stay
+in the file. "Slow zoom in" is what the window says. `in-center` is what the
+document stores. A Look is one choice that sets the pacing, the moves, the
+fill, and the join together, so the first screen is not four independent
+menus.
+
+The first screen offers a few Looks, one of them already selected. Further
+Looks, the fill list, and the move list are one step away, still as names.
+Enter and exit, a dragged point, a zoom number, and a blur amount are
+another step down, on a single picture, after someone has decided the
+suggested look is not enough. A control that only an author of the engine
+would understand does not appear on the way to Render.
+
+Presets are how the long path stays usable too. Customizing means starting
+from a named setting and changing one thing, then saving that as a new name
+if it should be reused. The window does not ask anyone to assemble a move
+from zoom atoms on the first visit.
+
+### What a slot edit is
+
+A one-move slot has an enter state and an exit state. Each state is a zoom
+and a point on the photograph. That is the commercial Ken Burns control,
+the start rectangle and the end rectangle.
+
+Zoom at an end is `full`, `fill`, `limit`, or a number at least `1`. The
+point is one of the named places (`center`, `left`, `right`, `top`,
+`bottom`, and the four corners) or a dragged `u,v` in `0..1`. Direction is
+not its own field. Left-to-right is an enter point on the left and an exit
+point on the right. The window can label that direction; the document stores
+the two points. On the preset list those labels are the whole control.
+`full`, `fill`, and `limit` show up only after someone opens More on that
+picture.
+
+`hold` is how long the enter state stays put before a zoom-in travels, or
+how long the exit state rests before the outgoing join on a zoom-out. The
+join on the slot is the transition that follows it. The short path never
+sets a per-slot join. One transition preset covers the whole video.
+
+While the slot still has a `mode` name, the window edits that mode. Every
+other slot with the same name follows. When the user changes one picture
+away from the shared move, the window detaches that slot: it writes
+`motion`, clears `mode`, and sets `basedOn` to the name it left. The spec
+already defines that handoff. The window says the picture is using its own
+move, and still shows the name it started from.
+
+A two-phase move (push in, then pan across the tight frame) is the same
+editor with another pair of states in between. It is offered as a named
+preset, not as a blank segment list.
+
+Family stays `reveal` for anything the window builds from enter and exit,
+unless the user picks a scan preset. A scan stays at `fill` and only pans.
+The window names that preset ("Move across the photo"). It does not let an
+untitled slot become a scan.
+
+### Fill
+
+The area the fitted photo does not cover is the canvas fill. The blurred
+cover of the same photo is one fill, and it is the one the engine draws
+today. It is not the one most people will want. Black bars, a flat color, a
+quiet pattern, or a different backdrop picture will be ordinary choices, so
+they are part of Montage 1, not a later version.
+
+The document field is `backdrop`. `fill` stays the zoom that covers the
+frame, so the bars do not reuse that word. A backdrop is a kind plus the
+few values that kind needs:
+
+```
+{ "kind": "blur",    "blur": 40 }
+{ "kind": "color",   "color": "#000000" }
+{ "kind": "pattern", "name": "grain", "color": "#1a1a1a" }
+{ "kind": "image",   "src": "backdrop.jpg", "blur": 0 }
+```
+
+`blur` is today's canvas: a cover-cropped copy of the same photo, with
+`blur` as the sigma. An omitted `backdrop` means that, with sigma `40`.
+`canvas.blur` still sets that sigma when `backdrop` is absent, so a document
+that only names the old field means the same thing. Setting both is an
+error.
+
+`color` is a flat `#RRGGBB` in the bars. `image` is a different picture,
+cover-cropped, with its own optional blur. The sigma defaults to `0` there,
+so the backdrop picture is sharp until someone asks for blur.
+
+`pattern` is a closed list. Version 1 has two:
+
+- `grain` is uniform noise on the color (strength 20, seed 1).
+- `gradient` runs from the color at the top to black at the bottom. It does
+  not move. The gradient speed is 0, and the seed is 1.
+
+An omitted pattern color is `#000000`. A pattern is not a formula and not a
+user-drawn asset.
+
+`canvas.backdrop` covers the video. `slot.backdrop` overrides it for one
+picture, once that picture has been customized. The short path never offers
+a per-picture backdrop. The window still calls this choice the fill.
+
+The window's suggested Look writes an explicit black `color` fill, because
+that is the bar treatment people already expect from a slideshow. "Blurred
+photo" is a fill preset, and it is what the Greenhouse look uses. Other fill
+presets are a handful of colors, a handful of patterns, and "choose a
+backdrop picture." The sigma and the exact color sit under More. The preset
+names do not.
+
+Scale, as a separate slider, would mean a second definition of zoom. The
+fitted photograph at zoom `1` is the whole picture. Enter zoom and exit zoom
+are the scale. The window calls them zoom, and only inside More.
+
+Rotation metadata is applied before fill zoom, and the window shows that as
+a fact about the file. A creative rotation, and a skew, are out of version 1.
+They are not fields, not presets, and not controls. A later Montage can add
+them. This one does not.
+
+### Joins
+
+The document today has one join, `fade`, with a duration greater than zero.
+That is the dissolve. The short path calls it Dissolve and uses one duration
+for the whole video.
+
+Slideshow joins may still be added to version 1. The `type` field was left
+open for that. Nothing here freezes the set, and nothing here puts a
+transition gallery on the first screen. A new join earns a place when a Look
+or a transition preset would actually use it, under a plain name. The first
+candidates, if we add any, are a cut and a dip to black. Wipes, page curls,
+and 3D turns stay off the list until someone wants one of them enough to
+name a preset. The default remains a dissolve either way.
+
+### Two preset kinds
+
+People see Looks, fills, moves, and transitions. Those are the presets. The
+file still has only two stored shapes.
+
+A **move preset** is a named mode. The four patterns in the shell script are
+the first four, plus `hold`. The window's names for them:
+
+| On screen | In the file |
+| --- | --- |
+| Slow zoom in | `in-center` |
+| Pan across | `in-left-right` |
+| Drift down | `in-top-bottom` |
+| Slow zoom out | `out-center` |
+| Hold still | `hold` |
+
+The script's `i % 4` is not four presets of a video. It is one video that
+cycles four moves. On screen that cycle is a single Look, not four decisions.
+
+A **Look** is a composition preset: a recipe with no photographs in it. It
+carries defaults (join, hold, zoom span, fill, ease), a timing policy, an
+output size, and an assignment rule for modes. Applying it sets those
+defaults and writes a `mode` on each slot. It does not replace the audio
+path or the picture list.
+
+Further move presets are more catalog rows, present so a Look can use them
+and so More has a longer list. They are not the first screen. Reverses and
+diagonals are the rest of the one-move table: `in-right-left`,
+`in-bottom-top`, the `out-` pans, and the four corner diagonals. Each gets a
+plain label when it is shown ("Pan back", "Drift up").
+
+Scans are named presets too, family `scan`: move across, or move up and down
+the photo, staying filled. A scan is how a wide group photo is treated when
+pulling back to the whole frame would shrink the faces. A Look may assign
+one. The home screen does not explain the family.
+
+Two-phase presets are named the same way, once they exist: "Zoom in, then
+pan" and "Pan, then zoom out." The segment list can hold them. The user
+picks the name.
+
+Shipped Looks, each a small document fragment. Three of them are enough for
+the first screen. The rest sit under More looks.
+
+- **Classic.** The suggested one. `fit-audio`, a moderate dissolve, a short
+  hold, a modest zoom span, black bars, output `1920×1080`. Assignment
+  alternates slow zoom in and slow zoom out. Load, render, done.
+- **Photo film.** The shell script. `fit-audio`, fade `1.5`, hold `1`, zoom
+  span `0.4`, blurred photo, same output size. Assignment cycles slow zoom
+  in, pan across, drift down, slow zoom out.
+- **Quick slides.** `fixed-clip` around five seconds, a shorter dissolve,
+  black bars, a cycle of the gentle zoom-ins.
+
+Further Looks, not on the first row:
+
+- **Portraits and groups.** After the images are loaded, tall frames get a
+  vertical move or a vertical scan, wide frames get a horizontal move. The
+  window looks at aspect ratio once, at apply time, and writes a mode name
+  per slot. The engine does not grow an aspect rule.
+- **Open and close.** First and last pictures hold still. The middle uses
+  the Classic alternation.
+
+Assignment rules live in the window. The document receives mode names. The
+rules are: one mode on every slot, cycle a list, alternate so adjacent slots
+differ, or pick from aspect as above. Re-applying a Look is explicit. Slots
+that have their own move keep it unless the user says to replace those too.
+
+Fill presets and transition presets are the same idea at a smaller size.
+Changing the fill does not reset the moves. Changing the transition does not
+reset the fill. A Look sets all of them so the short path is one choice;
+after that, each can be changed on its own.
+
+### Library
+
+Built-in moves ship in the engine catalog. Built-in Looks, fills, and
+transitions ship as data the window lists.
+
+A user's library is a directory of JSON fragments beside the app, not keys
+inside the project. Saving asks for a name and stores the thing they
+actually changed: a move, a fill, a transition, or a whole Look. Naming and
+overwrite are the window's job. The list they see later is those names, next
+to the built-in ones.
+
+A project has to render on a machine that does not have that library.
+Applying a user move copies the definition into the document's `modes`,
+unless the name is a built-in. Applying a Look copies defaults and mode
+names, and copies any user mode it references. After that, the Montage file
+is the whole edit.
+
+There is no Look field on the document. Remembering "this started as
+Classic" and then changing the shipped preset underneath old files would
+make a saved edit drift. The library holds the template. The file holds the
+values.
+
+### Screens
+
+One screen for the short path. The pictures, the song, a few Looks with one
+already selected, and Render. A line under the Look says how it will come
+out, in plain words: how many pictures, about how long each one stays, and
+that it dissolves between them. That is the check before a render. It does
+not mention zoom span or fill zoom.
+
+More is where the other presets are: more Looks, the fill names, the
+transition names, the move names applied to every picture. Still names, still
+one choice each.
+
+The picture editor opens from the filmstrip for one frame that should
+differ. It starts on the same move names. More on that picture is the two
+stills, enter and exit, a drag point, and the zoom choices. Hold and a
+different transition after this picture sit there too. The window detaches
+the picture when those change, and keeps the old preset name visible.
+
+Render progress is the ffmpeg log, unfiltered. The window does not invent a
+percent complete from a swallowed stderr.
+
+### Still to add to version 1
+
+The backdrop kinds above are in the specification and the engine. An omitted
+backdrop stays the blurred photo.
+
+Joins beyond `fade` are allowed to land in version 1, one plain preset at a
+time, starting from a cut or a dip to black if either is wanted. The set is
+not chosen yet.
+
+Creative rotation and skew are out of version 1. Metadata rotation stays.
+A later Montage is where a creative rotation or a skew would be added, as a
+named preset if they are added at all.

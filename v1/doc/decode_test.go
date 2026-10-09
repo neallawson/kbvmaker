@@ -21,7 +21,7 @@ func TestDecodeDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Montage != 1 || d.Canvas.Width != 3840 || d.Canvas.Blur != 40 {
+	if d.Montage != 1 || d.Canvas.Width != 3840 || d.Canvas.Backdrop.Kind != "blur" || d.Canvas.Backdrop.Sigma() != 40 {
 		t.Fatalf("defaults %+v", d.Canvas)
 	}
 	if d.Timing.Policy != "fit-audio" || d.Defaults.Hold != 1 || d.Defaults.Join.Duration != 1.5 {
@@ -82,5 +82,39 @@ func TestMotionRoundTrip(t *testing.T) {
 	}
 	if strings.Contains(seg[0].Zoom.End.Atoms[0].Sym, "nope") {
 		t.Fatal("unexpected")
+	}
+}
+
+func TestBackdropKinds(t *testing.T) {
+	d, err := Decode([]byte(`{
+	  "montage": 1,
+	  "audio": "song.mp3",
+	  "canvas": {"backdrop": {"kind": "color", "color": "#0000FF"}},
+	  "slots": [
+	    {"src": "a.jpg", "mode": "hold", "backdrop": {"kind": "pattern", "name": "grain"}},
+	    {"src": "b.jpg", "mode": "hold"}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Canvas.Backdrop.Kind != "color" || d.Canvas.Backdrop.Color != "#0000FF" {
+		t.Fatalf("canvas %+v", d.Canvas.Backdrop)
+	}
+	if d.Slots[0].Backdrop == nil || d.Slots[0].Backdrop.Name != "grain" || d.Slots[0].Backdrop.Color != "#000000" {
+		t.Fatalf("slot %+v", d.Slots[0].Backdrop)
+	}
+	if d.Slots[1].Backdrop != nil {
+		t.Fatal("second slot should inherit the canvas backdrop")
+	}
+	_, err = Decode([]byte(`{"montage":1,"audio":"a.mp3","canvas":{"blur":40,"backdrop":{"kind":"blur"}}}`))
+	re, ok := rule.As(err)
+	if !ok || re.Code != "unknown-field" {
+		t.Fatalf("both: %v", err)
+	}
+	_, err = Decode([]byte(`{"montage":1,"audio":"a.mp3","canvas":{"backdrop":{"kind":"pattern","name":"stripes"}}}`))
+	re, ok = rule.As(err)
+	if !ok || re.Code != "unknown-field" {
+		t.Fatalf("pattern: %v", err)
 	}
 }

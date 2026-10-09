@@ -17,9 +17,18 @@ type Plan struct {
 
 // Canvas is the working still that zoompan reads.
 type Canvas struct {
-	Width  int     `json:"width"`
-	Height int     `json:"height"`
-	Blur   float64 `json:"blur"`
+	Width    int      `json:"width"`
+	Height   int      `json:"height"`
+	Backdrop Backdrop `json:"backdrop"`
+}
+
+// Backdrop is the resolved bars behind the fitted photograph.
+type Backdrop struct {
+	Kind  string  `json:"kind"`
+	Blur  float64 `json:"blur,omitempty"`
+	Color string  `json:"color,omitempty"`
+	Name  string  `json:"name,omitempty"`
+	Src   string  `json:"src,omitempty"`
 }
 
 // Output is the encoded frame.
@@ -37,20 +46,21 @@ type Output struct {
 
 // Slot is one picture on the resolved timeline.
 type Slot struct {
-	Index       int     `json:"index"`
-	Src         string  `json:"src"`
-	Mode        string  `json:"mode,omitempty"`
-	BasedOn     string  `json:"basedOn,omitempty"`
-	Family      string  `json:"family"`
-	ClipStart   float64 `json:"clipStart"`
-	ClipDur     float64 `json:"clipDur"`
-	OpaqueStart float64 `json:"opaqueStart"`
-	OpaqueEnd   float64 `json:"opaqueEnd"`
-	Fill        float64 `json:"fill"`
-	FarZoom     float64 `json:"farZoom"`
-	Join        *Join   `json:"join,omitempty"`
-	Spans       []Span  `json:"-"`
-	Fit         Fit     `json:"-"`
+	Index       int      `json:"index"`
+	Src         string   `json:"src"`
+	Mode        string   `json:"mode,omitempty"`
+	BasedOn     string   `json:"basedOn,omitempty"`
+	Family      string   `json:"family"`
+	ClipStart   float64  `json:"clipStart"`
+	ClipDur     float64  `json:"clipDur"`
+	OpaqueStart float64  `json:"opaqueStart"`
+	OpaqueEnd   float64  `json:"opaqueEnd"`
+	Fill        float64  `json:"fill"`
+	Backdrop    Backdrop `json:"backdrop"`
+	FarZoom     float64  `json:"farZoom"`
+	Join        *Join    `json:"join,omitempty"`
+	Spans       []Span   `json:"-"`
+	Fit         Fit      `json:"-"`
 }
 
 // Join is the dissolve that follows a slot.

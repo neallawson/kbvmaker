@@ -8,7 +8,7 @@ The application is kbvmaker. The file format is Montage. A usual project file is
 
 Montage 1 and the Go engine that loads it are in this tree. The command line can print the resolved plan, export a bash script, export the same commands as JSON, or render.
 
-A windowed interface is later work. The resolution rules stay in the `v1` packages.
+A windowed interface is later work. Its shape is in `IDEAS.md` under Front end. The resolution rules stay in the `v1` packages.
 
 `make_Greenhouse_video_v3.sh` is the first Greenhouse tape, kept as a reference. It is not the application.
 
