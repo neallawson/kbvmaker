@@ -1,0 +1,21 @@
+# Go build and test output
+/kbvmaker
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace files are local
+go.work
+go.work.sum
+
+# Engine render directory and ffmpeg intermediates
+/work/
+clip_*.mp4
+canvas_*.png
+video_crossfaded.mp4
+*.mp4

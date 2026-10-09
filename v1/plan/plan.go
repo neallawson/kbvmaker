@@ -1,0 +1,145 @@
+// Package plan resolves a Montage document into a timeline.
+package plan
+
+import (
+	"context"
+	"os"
+
+	"neal/kbvmaker/v1/check"
+	"neal/kbvmaker/v1/clock"
+	"neal/kbvmaker/v1/doc"
+	"neal/kbvmaker/v1/frame"
+	"neal/kbvmaker/v1/media"
+	"neal/kbvmaker/v1/model"
+	"neal/kbvmaker/v1/motion"
+	"neal/kbvmaker/v1/rule"
+	"neal/kbvmaker/v1/schedule"
+	"neal/kbvmaker/v1/timing"
+	"neal/kbvmaker/v1/version"
+)
+
+// Resolve probes media, expands modes, and checks the timeline.
+// Authored slots win over a pool. A pool is read only when slots are absent.
+func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Plan, error) {
+	if err := d.Validate(); err != nil {
+		return nil, err
+	}
+	if err := requireFilters(ctx, probe); err != nil {
+		return nil, err
+	}
+	audio := doc.ResolvePath(d.Dir, d.Audio)
+	if err := exists(audio); err != nil {
+		return nil, rule.E(0, "missing-media", "audio %s", d.Audio)
+	}
+	song, err := probe.Duration(ctx, audio)
+	if err != nil {
+		return nil, rule.E(0, "missing-media", "audio %s: %v", d.Audio, err)
+	}
+	if song <= 0 {
+		return nil, rule.E(0, "bad-number", "song duration %v", song)
+	}
+	slots := d.Slots
+	if len(slots) == 0 {
+		slots, err = schedule.Generate(d, song)
+		if err != nil {
+			return nil, err
+		}
+		checkDoc := *d
+		checkDoc.Slots = slots
+		checkDoc.Pool = nil
+		checkDoc.Schedule = nil
+		checkDoc.Timing.HasCount = false
+		if err := checkDoc.Validate(); err != nil {
+			return nil, err
+		}
+	}
+	windows, videoDur, err := timing.Resolve(d, slots, song)
+	if err != nil {
+		return nil, err
+	}
+	outFile := d.Output.File
+	if outFile == "" {
+		outFile = "out.mp4"
+	}
+	p := &model.Plan{
+		Montage:    version.Current,
+		Kind:       "resolved",
+		Song:       song,
+		Duration:   videoDur,
+		Dir:        d.Dir,
+		Audio:      d.Audio,
+		OutputFile: outFile,
+		Canvas:     model.Canvas{Width: d.Canvas.Width, Height: d.Canvas.Height, Blur: d.Canvas.Blur},
+		Output: model.Output{
+			Width: d.Output.Width, Height: d.Output.Height, FPS: d.Output.FPS,
+			VideoCodec: d.Output.VideoCodec, CRF: d.Output.CRF, Preset: d.Output.Preset,
+			PixFmt: d.Output.PixFmt, AudioCodec: d.Output.AudioCodec, AudioBitrate: d.Output.AudioBitrate,
+		},
+	}
+	images := map[string]media.Info{}
+	for i, s := range slots {
+		w := windows[i]
+		path := doc.ResolvePath(d.Dir, s.Src)
+		if err := exists(path); err != nil {
+			return nil, rule.E(i+1, "missing-media", "image %s", s.Src)
+		}
+		info, ok := images[path]
+		if !ok {
+			info, err = probe.Image(ctx, path)
+			if err != nil {
+				return nil, rule.E(i+1, "missing-media", "image %s: %v", s.Src, err)
+			}
+			if info.Width < 1 || info.Height < 1 {
+				return nil, rule.E(i+1, "missing-media", "image %s has no displayed size", s.Src)
+			}
+			images[path] = info
+		}
+		fit := frame.FitRect(info.Width, info.Height, d.Canvas.Width, d.Canvas.Height)
+		fill := frame.Fill(info.Width, info.Height, d.Canvas.Width, d.Canvas.Height)
+		place := clock.Place{
+			Song: song, ClipStart: w.ClipStart, ClipDur: w.ClipDur,
+			OpaqueStart: w.OpaqueStart, OpaqueEnd: w.OpaqueEnd, FPS: d.Output.FPS,
+		}
+		family, mode, basedOn, spans, err := motion.Resolve(s, d.Modes, place, d.Defaults.ZoomSpan, d.Defaults.Hold, fill, i+1)
+		if err != nil {
+			return nil, err
+		}
+		far := 1.0
+		for _, sp := range spans {
+			if sp.Z0 > far {
+				far = sp.Z0
+			}
+			if sp.Z1 > far {
+				far = sp.Z1
+			}
+		}
+		p.Slots = append(p.Slots, model.Slot{
+			Index: i + 1, Src: s.Src, Mode: mode, BasedOn: basedOn, Family: family,
+			ClipStart: w.ClipStart, ClipDur: w.ClipDur,
+			OpaqueStart: w.OpaqueStart, OpaqueEnd: w.OpaqueEnd,
+			Fill: fill, FarZoom: far, Join: w.Join, Spans: spans, Fit: fit,
+		})
+	}
+	if err := check.All(p); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func requireFilters(ctx context.Context, probe media.Probe) error {
+	have, err := probe.Filters(ctx)
+	if err != nil {
+		return err
+	}
+	for _, name := range media.RequiredFilters {
+		if !have[name] {
+			return rule.E(0, "missing-media", "ffmpeg has no %s filter", name)
+		}
+	}
+	return nil
+}
+
+func exists(path string) error {
+	_, err := os.Stat(path)
+	return err
+}
