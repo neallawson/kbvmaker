@@ -18,7 +18,7 @@ A later Montage is a new package (`v2`) that accepts `montage: 2`. Keep `v1` abl
 Document → Plan → []Command → bash | renderPlan JSON | exec
 ```
 
-The CLI and a future Wails window call `v1`. They do not contain resolution rules.
+The CLI, `web/v1`, and the Wails window call `v1`. They do not contain resolution rules. HTTP lives in `web/v1`. The Svelte client lives in `frontend/src/lib/montage/v1`. A later Montage is `web/v2` and `frontend/src/lib/montage/v2`. Shared UI is `frontend/src/lib/components/ui` and `frontend/src/lib/platform`.
 
 Probing media and executing ffmpeg are the only edges. Packages between them take and return values.
 
@@ -41,10 +41,10 @@ Zoom `1.0` means the whole photograph is in frame. Apply rotation metadata befor
 
 ## Tests
 
-`go test ./...` is the check. Add a test at the seam you changed: decode, clock, frame, schedule, timing, motion, check, or golden argv.
+`go test ./...` is the Go check. Add a test at the seam you changed: decode, clock, frame, schedule, timing, motion, check, golden argv, or an HTTP handler. `pnpm test` in `frontend/` is the client check. Add a test for a v1 client behavior or a screen you changed.
 
 The render test in `v1/render_test.go` writes a PNG and a short WAV, renders a hold, and probes the output. Run it when a change can affect ffmpeg filters, size, or duration. It skips when ffmpeg is absent.
 
 ## Out of scope unless asked
 
-Do not start the GUI. Do not commit, push, or open a pull request. Flag overrides exist as `doc.ApplyOverrides` and are not wired to the CLI yet. Baking a generated schedule back into a Montage file is not a user-facing function yet.
+Do not commit, push, or open a pull request. Do not add session management or a second engine binding for Wails. Flag overrides exist as `doc.ApplyOverrides` and are not wired to the CLI yet. Baking a generated schedule back into a Montage file is not a user-facing function yet. Creative rotation and skew stay out of version 1.

@@ -1022,3 +1022,54 @@ not chosen yet.
 Creative rotation and skew are out of version 1. Metadata rotation stays.
 A later Montage is where a creative rotation or a skew would be added, as a
 named preset if they are added at all.
+
+## Hosts
+
+The window and the local browser are two hosts of one Svelte client. Both
+talk to the Go engine over HTTP at `/v1`. The engine packages stay free of
+HTTP and of Wails. Handlers in `web/v1` call `neal/kbvmaker/v1` the way the
+CLI does.
+
+Wails is a window onto that server, plus the native open and save dialogs a
+browser cannot provide. It does not grow a second set of engine calls.
+Server-sent events carry the ffmpeg log, so render progress is the same in
+both hosts.
+
+This version's browser app is that local server. ffmpeg runs on the machine
+where the server runs. A person at this version will prefer the window. The
+browser is how the same screens are exercised, and how the later site stays
+the same client.
+
+A public multi-session site is not this version. There is no login, no user
+table, and no session middleware. Each request names a Montage document.
+The engine already takes the project directory from that file. Later, a
+session layer can sit in front of these handlers and own a directory per
+session. The screens and `/v1` stay put.
+
+A browser file input does not give the local server a filesystem path. This
+version's browser host sends the path the person typed, because the server
+is on that machine and the files are already on disk. The window uses a
+native dialog and sends the same kind of path. Uploading bytes into a
+session directory belongs to the multi-session site.
+
+Versions split by tree. `web/v1` and `frontend/src/lib/montage/v1` are
+Montage 1. They do not import a future v2. Shared code is the app frame,
+the design system, and `frontend/src/lib/platform` (dialogs and other host
+differences). The shell reads `montage` and mounts that version's editor.
+An unrecognized version is a plain message that this build cannot open it.
+
+```
+web/v1/                          HTTP, rule errors as JSON
+frontend/src/lib/components/ui/  shadcn-svelte
+frontend/src/lib/platform/       browser and window hosts
+frontend/src/lib/montage/v1/     client, presets, screens
+frontend/src/routes/             shell only
+```
+
+The UI is SvelteKit, Svelte 5, and Tailwind 4, with shadcn-svelte. The build
+is a static client. Kit routes do not resolve a Montage. Buttons, dialogs,
+menus, and forms come from shadcn-svelte. The filmstrip, the Look row, and
+the enter/exit stills are custom components in the v1 editor.
+
+`/v1` returns the rule error as `{ "slot", "code", "message" }`. Tests cover
+the handlers without a window, and the v1 client and screens without Wails.

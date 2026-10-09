@@ -8,7 +8,7 @@ The application is kbvmaker. The file format is Montage. A usual project file is
 
 Montage 1 and the Go engine that loads it are in this tree. The command line can print the resolved plan, export a bash script, export the same commands as JSON, or render.
 
-A windowed interface is later work. Its shape is in `IDEAS.md` under Front end. The resolution rules stay in the `v1` packages.
+The window and the local browser are two hosts of one Svelte client. Both call the Go API at `/v1`. The shape is in `IDEAS.md` under Hosts. A multi-session site is later. The resolution rules stay in the `v1` packages.
 
 `make_Greenhouse_video_v3.sh` is the first Greenhouse tape, kept as a reference. It is not the application.
 
@@ -35,9 +35,11 @@ kbvmaker plan          file.montage.json
 kbvmaker export-script file.montage.json
 kbvmaker export-plan   file.montage.json
 kbvmaker render        file.montage.json
+kbvmaker serve
+go build -tags production -o kbvmaker-window ./cmd/desktop
 ```
 
-`plan` prints the resolved timeline. `export-script` and `export-plan` print ffmpeg argument lists, as bash and as a `renderPlan` JSON document. `render` runs those commands with the Montage file's directory as the working directory and writes intermediate files under `work/`.
+`plan` prints the resolved timeline. `export-script` and `export-plan` print ffmpeg argument lists, as bash and as a `renderPlan` JSON document. `render` runs those commands with the Montage file's directory as the working directory and writes intermediate files under `work/`. `serve` listens on `127.0.0.1:8787` and exposes `/v1`. Pass `-addr` to change the address, and `-static frontend/build` to serve the client from the same origin. `kbvmaker-window` opens that client in a Wails window and adds a native file dialog. Build the client first.
 
 ## Layout
 
@@ -50,6 +52,8 @@ Document → Plan → []Command → bash | renderPlan JSON | exec
 | Package | Responsibility |
 | --- | --- |
 | `v1` | Facade: load, resolve, compile, export, run. |
+| `web/v1` | HTTP API for Montage 1. |
+| `frontend/` | Svelte client shared by the browser and the window. |
 | `v1/version` | The integer shared by the API, `montage`, and `renderPlan`. |
 | `v1/doc` | JSON types, defaults, and structural checks. |
 | `v1/model` | The resolved plan. |
@@ -72,6 +76,7 @@ Document → Plan → []Command → bash | renderPlan JSON | exec
 
 ```
 go test ./...
+pnpm --dir frontend test
 ```
 
 Unit tests cover decode, clocks, fill zoom, scheduling, and the 20-second two-clip timing case. One test resolves a document through a fake probe and checks that both exports carry the compiler's argv. One test writes a PNG and a WAV, renders a short hold, and checks the output size and duration with ffprobe.

@@ -13,6 +13,11 @@ coverage.html
 go.work
 go.work.sum
 
+# Frontend
+frontend/node_modules/
+frontend/build/
+frontend/.svelte-kit/
+
 # Engine render directory and ffmpeg intermediates
 /work/
 clip_*.mp4
