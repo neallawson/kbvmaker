@@ -27,7 +27,7 @@ Where `IDEAS.md` and `montage-v1.md` disagree, the specification wins.
 
 Go 1.23. ffmpeg and ffprobe on `PATH` for probing media and for `render`. `go test ./...` skips the short render when ffmpeg is absent.
 
-The window on Linux needs WebKitGTK and python3 with GTK 3 (`python3-gi`) for the file dialogs. Releases target Ubuntu 22.04 or newer with `libwebkit2gtk-4.1-dev`. Older systems with only `libwebkit2gtk-4.0-dev` can build the window for development.
+The window on Linux needs WebKitGTK, which brings GTK 3. The file dialogs are native GTK, built with cgo against the same library, so nothing else is required. Windows and macOS use the Wails dialogs. Releases target Ubuntu 22.04 or newer with `libwebkit2gtk-4.1-dev`. Older systems with only `libwebkit2gtk-4.0-dev` can build the window for development.
 
 ## Command line
 

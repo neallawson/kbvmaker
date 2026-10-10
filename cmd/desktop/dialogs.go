@@ -30,7 +30,7 @@ func (d *Dialogs) startup(ctx context.Context) {
 // OpenMontage asks for a project file and returns its path.
 // An empty path means the dialog was cancelled.
 func (d *Dialogs) OpenMontage() (string, error) {
-	paths, err := pickFiles("open", "Open Montage", d.montageDir, "", "Montage", []string{"*.montage.json", "*.json"})
+	paths, err := d.pickFiles("open", "Open Montage", d.montageDir, "", "Montage", []string{"*.montage.json", "*.json"})
 	if err != nil {
 		return "", err
 	}
@@ -41,7 +41,7 @@ func (d *Dialogs) OpenMontage() (string, error) {
 
 // SaveMontage asks where a new project should be written.
 func (d *Dialogs) SaveMontage() (string, error) {
-	paths, err := pickFiles("save", "Save Montage", d.montageDir, "piece.montage.json", "Montage", []string{"*.montage.json", "*.json"})
+	paths, err := d.pickFiles("save", "Save Montage", d.montageDir, "piece.montage.json", "Montage", []string{"*.montage.json", "*.json"})
 	if err != nil {
 		return "", err
 	}
@@ -52,7 +52,7 @@ func (d *Dialogs) SaveMontage() (string, error) {
 
 // OpenImages asks for slideshow pictures.
 func (d *Dialogs) OpenImages() ([]string, error) {
-	paths, err := pickFiles("multi", "Add pictures", d.imageDir, "", "Images", []string{"*.jpg", "*.jpeg", "*.png", "*.webp", "*.JPG", "*.JPEG", "*.PNG", "*.WEBP"})
+	paths, err := d.pickFiles("multi", "Add pictures", d.imageDir, "", "Images", []string{"*.jpg", "*.jpeg", "*.png", "*.webp", "*.JPG", "*.JPEG", "*.PNG", "*.WEBP"})
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (d *Dialogs) OpenImages() ([]string, error) {
 
 // OpenAudio asks for the soundtrack.
 func (d *Dialogs) OpenAudio() (string, error) {
-	paths, err := pickFiles("open", "Add song", d.audioDir, "", "Audio", []string{"*.mp3", "*.wav", "*.m4a", "*.flac", "*.aac", "*.MP3", "*.WAV", "*.M4A", "*.FLAC", "*.AAC"})
+	paths, err := d.pickFiles("open", "Add song", d.audioDir, "", "Audio", []string{"*.mp3", "*.wav", "*.m4a", "*.flac", "*.aac", "*.MP3", "*.WAV", "*.M4A", "*.FLAC", "*.AAC"})
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +75,7 @@ func (d *Dialogs) OpenAudio() (string, error) {
 
 // SaveScript asks where the shell script should be written.
 func (d *Dialogs) SaveScript() (string, error) {
-	paths, err := pickFiles("save", "Export shell script", d.scriptDir, "render.sh", "Shell script", []string{"*.sh"})
+	paths, err := d.pickFiles("save", "Export shell script", d.scriptDir, "render.sh", "Shell script", []string{"*.sh"})
 	if err != nil {
 		return "", err
 	}
@@ -86,7 +86,7 @@ func (d *Dialogs) SaveScript() (string, error) {
 
 // SaveVideo asks where the rendered video should be written.
 func (d *Dialogs) SaveVideo() (string, error) {
-	paths, err := pickFiles("save", "Render video", d.videoDir, "out.mp4", "Video", []string{"*.mp4"})
+	paths, err := d.pickFiles("save", "Render video", d.videoDir, "out.mp4", "Video", []string{"*.mp4"})
 	if err != nil {
 		return "", err
 	}
