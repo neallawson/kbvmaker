@@ -1,5 +1,7 @@
 # Go build and test output
 /kbvmaker
+/kbvmaker-window
+__pycache__/
 *.exe
 *.dll
 *.so
