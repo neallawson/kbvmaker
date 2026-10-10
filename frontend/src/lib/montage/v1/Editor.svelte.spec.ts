@@ -147,4 +147,36 @@ describe('Editor', () => {
 		expect(last?.slots?.[1].dur).toBe(40);
 		expect(last?.slots?.[0].dur).toBeUndefined();
 	});
+
+	it('locks the editor and shows progress beside Render until the video is written', async () => {
+		const user = userEvent.setup();
+		const api = client({
+			montage: 1,
+			audio: 'song.mp3',
+			timing: { policy: 'fit-audio' },
+			slots: [{ src: 'a.jpg', mode: 'in-center' }]
+		});
+		let finish = () => {};
+		api.client.render = () => new Promise<void>((resolve) => (finish = resolve));
+		const host: Host = {
+			name: 'window',
+			pickMontage: async () => '/films/piece.montage.json',
+			pickSaveVideo: async () => '/films/out.mp4'
+		};
+		render(Editor, { client: api.client, host });
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+		await user.click(await screen.findByRole('button', { name: 'Render video' }));
+
+		expect((await screen.findByRole('status')).textContent).toContain('Rendering…');
+		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).matches(':disabled')).toBe(
+			true
+		);
+		expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).matches(':disabled')).toBe(true);
+
+		finish();
+		expect(await screen.findByText(/Wrote out\.mp4 in 0:0\d/)).toBeTruthy();
+		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).matches(':disabled')).toBe(
+			false
+		);
+	});
 });

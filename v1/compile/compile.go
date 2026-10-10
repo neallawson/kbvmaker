@@ -3,6 +3,7 @@ package compile
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -23,6 +24,9 @@ type Options struct {
 	FFProbe       string
 	MaxJoinInputs int
 	Verbose       bool
+	// Work is the directory for canvases, clips, and joins, relative to the
+	// project directory unless absolute. Empty means "work".
+	Work string
 }
 
 // ffmpeg starts an ffmpeg argv that overwrites its output.
@@ -42,6 +46,9 @@ func (o Options) norm() Options {
 	}
 	if o.MaxJoinInputs < 2 {
 		o.MaxJoinInputs = 32
+	}
+	if o.Work == "" {
+		o.Work = "work"
 	}
 	return o
 }
@@ -65,7 +72,7 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 		if _, ok := canvasOf[key]; ok {
 			continue
 		}
-		path := fmt.Sprintf("work/canvas-%d.png", n)
+		path := filepath.Join(opt.Work, fmt.Sprintf("canvas-%d.png", n))
 		canvasOf[key] = path
 		n++
 		args := append(opt.ffmpeg(), "-i", s.Src)
@@ -77,7 +84,7 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 	}
 	clips := make([]string, len(p.Slots))
 	for i, s := range p.Slots {
-		clips[i] = fmt.Sprintf("work/clip-%03d.mp4", i)
+		clips[i] = filepath.Join(opt.Work, fmt.Sprintf("clip-%03d.mp4", i))
 		cmds = append(cmds, Command{Stage: "clip", Argv: append(opt.ffmpeg(),
 			"-loop", "1", "-framerate", strconv.Itoa(p.Output.FPS),
 			"-i", canvasOf[canvasKey(s)],
@@ -103,7 +110,7 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 		var joinCmds []Command
 		seq := 0
 		name := func() string {
-			path := fmt.Sprintf("work/join-%03d.mp4", seq)
+			path := filepath.Join(opt.Work, fmt.Sprintf("join-%03d.mp4", seq))
 			seq++
 			return path
 		}

@@ -12,8 +12,13 @@ import (
 
 // Script is a bash program that runs the commands from the project directory.
 func Script(cmds []compile.Command) string {
+	return ScriptIn(cmds, "work")
+}
+
+// ScriptIn is Script with the intermediate files under work.
+func ScriptIn(cmds []compile.Command, work string) string {
 	var b strings.Builder
-	b.WriteString("#!/bin/bash\nset -euo pipefail\nmkdir -p work\n")
+	fmt.Fprintf(&b, "#!/bin/bash\nset -euo pipefail\nmkdir -p %s\n", bashQuote(work))
 	for _, c := range cmds {
 		if c.Stage != "" {
 			fmt.Fprintf(&b, "\n# %s\n", c.Stage)

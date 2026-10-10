@@ -184,7 +184,7 @@ func (h Handler) render(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := engine.Run(r.Context(), dir, cmds); err != nil {
+	if err := engine.RunWith(r.Context(), dir, cmds, engine.RunOptions{Atomic: true}); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{
 			"slot": 0, "code": "render", "message": err.Error(),
 		})

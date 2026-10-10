@@ -20,6 +20,8 @@ Document → Plan → []Command → bash | renderPlan JSON | exec
 
 The CLI, `web/v1`, and the Wails window call `v1`. They do not contain resolution rules. HTTP lives in `web/v1`. The Svelte client lives in `frontend/src/lib/montage/v1`. A later Montage is `web/v2` and `frontend/src/lib/montage/v2`. Shared UI is `frontend/src/lib/components/ui` and `frontend/src/lib/platform`.
 
+The CLI in `cmd/kbvmaker` imports the `v1` facade, `v1/doc` and `v1/model` types, and `web` for `serve`. It does not call `plan`, `compile`, or `run` directly. Its contract is in `CLI.md`: results on stdout or `-o`, progress and errors on stderr, exit codes 0/1/2/3/4/5/130, and `-json` errors shaped like `/v1`. Changing an exit code, a stream, or the JSON shape breaks pipelines. Update `CLI.md` and `cmd/kbvmaker/cli_test.go` with it. The CLI does not create or edit documents yet. That waits on moving the editor's document operations from `frontend/src/lib/montage/v1/document.ts` into Go.
+
 Probing media and executing ffmpeg are the only edges. Packages between them take and return values.
 
 | Change | Where it goes |
@@ -47,4 +49,4 @@ The render test in `v1/render_test.go` writes a PNG and a short WAV, renders a h
 
 ## Out of scope unless asked
 
-Do not commit, push, or open a pull request. Do not add session management or a second engine binding for Wails. The window's only non-dialog binding is `API.Call`, which carries `/v1` requests to the same handler because older WebKitGTK drops POST bodies. Flag overrides exist as `doc.ApplyOverrides` and are not wired to the CLI yet. Baking a generated schedule back into a Montage file is not a user-facing function yet. Creative rotation and skew stay out of version 1.
+Do not commit, push, or open a pull request. Do not add session management or a second engine binding for Wails. The window's only non-dialog binding is `API.Call`, which carries `/v1` requests to the same handler because older WebKitGTK drops POST bodies. Baking a generated schedule back into a Montage file is not a user-facing function yet. Creative rotation and skew stay out of version 1.

@@ -38,6 +38,8 @@
 	let error = $state('');
 	let errorSlot = $state(0);
 	let busy = $state('');
+	let working = $state(false);
+	let elapsed = $state(0);
 	let songDraft = $state('');
 	let songSeconds = $state<number | null>(null);
 	let pictureDraft = $state('');
@@ -246,6 +248,7 @@
 		const target = dest || `${projectDir(filePath)}/render.sh`;
 		busy = 'Writing the shell script…';
 		error = '';
+		const stop = startWork();
 		try {
 			if (dirty || !filePath) {
 				if (!(await save())) {
@@ -254,10 +257,12 @@
 				}
 			}
 			await client.exportScript(filePath, target);
-			busy = 'Wrote the shell script';
+			busy = `Wrote ${baseName(target)}`;
 		} catch (err) {
 			busy = '';
 			error = err instanceof Error ? err.message : 'Could not write the shell script';
+		} finally {
+			stop();
 		}
 	}
 
@@ -278,16 +283,40 @@
 				output: { ...doc.output, width: doc.output?.width ?? 1920, height: doc.output?.height ?? 1080, file: video }
 			});
 			busy = 'Rendering…';
-			if (!(await save())) {
-				busy = '';
-				return;
+			const stop = startWork();
+			try {
+				if (!(await save())) {
+					busy = '';
+					return;
+				}
+				await client.render(filePath);
+			} finally {
+				stop();
 			}
-			await client.render(filePath);
-			busy = 'Wrote the video';
+			busy = `Wrote ${baseName(video)} in ${clock(elapsed)}`;
 		} catch (err) {
 			busy = '';
 			error = err instanceof Error ? err.message : 'Could not render the video';
 		}
+	}
+
+	/** startWork locks the editor and counts seconds until the returned stop runs. */
+	function startWork(): () => void {
+		working = true;
+		elapsed = 0;
+		const started = Date.now();
+		const timer = setInterval(() => {
+			elapsed = Math.floor((Date.now() - started) / 1000);
+		}, 1000);
+		return () => {
+			clearInterval(timer);
+			elapsed = Math.floor((Date.now() - started) / 1000);
+			working = false;
+		};
+	}
+
+	function clock(seconds: number): string {
+		return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 	}
 
 	function sharesSong(file: MontageFile): boolean {
@@ -306,6 +335,7 @@
 		<p class="text-muted-foreground text-sm">{dirty ? 'Unsaved changes' : filePath ? 'Saved' : ''}</p>
 	</header>
 
+	<fieldset class="flex min-w-0 flex-col gap-4" disabled={working} aria-busy={working}>
 	<div class="flex flex-wrap gap-2">
 		{#if !host.pickSaveMontage}
 			<input
@@ -314,9 +344,9 @@
 				bind:value={pathDraft}
 			/>
 		{/if}
-		<Button onclick={newProjectFile}>New</Button>
-		<Button variant="outline" onclick={() => openProject()}>Open</Button>
-		<Button variant="outline" onclick={save} disabled={!doc}>Save</Button>
+		<Button onclick={newProjectFile} disabled={working}>New</Button>
+		<Button variant="outline" onclick={() => openProject()} disabled={working}>Open</Button>
+		<Button variant="outline" onclick={save} disabled={working || !doc}>Save</Button>
 	</div>
 	{#if filePath}
 		<p class="text-sm">{filePath}</p>
@@ -474,17 +504,22 @@
 			</ul>
 		</section>
 
-		<div class="flex flex-wrap gap-2">
-			<Button variant="outline" onclick={exportScript} disabled={!doc.audio || !doc.slots?.length}>
+		<div class="flex flex-wrap items-center gap-2">
+			<Button variant="outline" onclick={exportScript} disabled={working || !doc.audio || !doc.slots?.length}>
 				Export shell script
 			</Button>
-			<Button onclick={render} disabled={!doc.audio || !doc.slots?.length}>Render video</Button>
+			<Button onclick={render} disabled={working || !doc.audio || !doc.slots?.length}>Render video</Button>
+			{#if busy}
+				<p role="status" class="text-sm">
+					{busy}
+					{#if working}
+						<span class="text-muted-foreground"> {clock(elapsed)}</span>
+					{/if}
+				</p>
+			{/if}
 		</div>
 	{/if}
-
-	{#if busy}
-		<p>{busy}</p>
-	{/if}
+	</fieldset>
 	{#if error && errorSlot === 0}
 		<p role="alert">{error}</p>
 	{/if}
