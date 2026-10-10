@@ -118,3 +118,35 @@ func TestBackdropKinds(t *testing.T) {
 		t.Fatalf("pattern: %v", err)
 	}
 }
+
+func TestDraftOmitsSongAndPictures(t *testing.T) {
+	d, err := Decode([]byte(`{"montage":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.ValidateShape(); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Validate(); err == nil {
+		t.Fatal("expected a draft to be unready")
+	}
+}
+
+func TestFitAudioRejectsAPinOnEveryPicture(t *testing.T) {
+	d, err := Decode([]byte(`{
+	  "montage": 1,
+	  "audio": "song.mp3",
+	  "slots": [
+	    {"src": "a.jpg", "mode": "hold", "dur": 8},
+	    {"src": "b.jpg", "mode": "hold", "dur": 8}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = d.Validate()
+	re, ok := rule.As(err)
+	if !ok || re.Code != "bad-time" {
+		t.Fatalf("pins: %v", err)
+	}
+}

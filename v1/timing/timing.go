@@ -20,7 +20,7 @@ func Resolve(d *doc.Document, slots []doc.Slot, song float64) ([]model.Window, f
 	var err error
 	switch d.Timing.Policy {
 	case "fit-audio":
-		durs, joins, err = equal(d, slots, song, 0, true)
+		durs, joins, err = fitAudio(d, slots, song)
 	case "fixed-clip":
 		durs, joins, err = equal(d, slots, song, d.Timing.Clip, false)
 	case "explicit":
@@ -34,6 +34,54 @@ func Resolve(d *doc.Document, slots []doc.Slot, song float64) ([]model.Window, f
 		return nil, 0, err
 	}
 	return windows(durs, joins)
+}
+
+func fitAudio(d *doc.Document, slots []doc.Slot, song float64) ([]float64, []float64, error) {
+	x, err := uniform(d, slots)
+	if err != nil {
+		return nil, nil, err
+	}
+	n := len(slots)
+	if n == 1 {
+		if slots[0].Dur != nil && math.Abs(*slots[0].Dur-song) > 1e-6 {
+			return nil, nil, rule.E(1, "bad-time", "the only picture runs for the whole song")
+		}
+		return []float64{song}, nil, nil
+	}
+	sumP := 0.0
+	pinned := 0
+	lastPin := 0
+	for i, s := range slots {
+		if s.Dur == nil {
+			continue
+		}
+		if *s.Dur <= x {
+			return nil, nil, rule.E(i+1, "bad-time", "picture length %v is not longer than the dissolve %v", *s.Dur, x)
+		}
+		sumP += *s.Dur
+		pinned++
+		lastPin = i + 1
+	}
+	if pinned == n {
+		return nil, nil, rule.E(n, "bad-time", "leave one picture sharing the song")
+	}
+	shared := (song + float64(n-1)*x - sumP) / float64(n-pinned)
+	if shared <= x {
+		return nil, nil, rule.E(lastPin, "bad-time", "the other pictures would be no longer than the dissolve")
+	}
+	durs := make([]float64, n)
+	for i, s := range slots {
+		if s.Dur != nil {
+			durs[i] = *s.Dur
+			continue
+		}
+		durs[i] = shared
+	}
+	joins := make([]float64, n-1)
+	for i := range joins {
+		joins[i] = x
+	}
+	return durs, joins, nil
 }
 
 func equal(d *doc.Document, slots []doc.Slot, song, clip float64, fromSong bool) ([]float64, []float64, error) {

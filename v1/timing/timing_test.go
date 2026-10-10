@@ -42,6 +42,46 @@ func TestFitAudioTwoClips(t *testing.T) {
 	}
 }
 
+func TestFitAudioPinSharesTheRest(t *testing.T) {
+	pin := 8.0
+	d := &doc.Document{
+		Timing:   doc.Timing{Policy: "fit-audio"},
+		Defaults: defaults(),
+		Output:   doc.Output{FPS: 30},
+		Slots: []doc.Slot{
+			{Src: "a.jpg", Mode: "in-center", Dur: &pin},
+			{Src: "b.jpg", Mode: "out-center"},
+			{Src: "c.jpg", Mode: "hold"},
+		},
+	}
+	w, dur, err := Resolve(d, d.Slots, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(dur-20) > 1e-9 {
+		t.Fatalf("duration %v", dur)
+	}
+	if math.Abs(w[0].ClipDur-8) > 1e-9 || math.Abs(w[1].ClipDur-7.5) > 1e-9 || math.Abs(w[2].ClipDur-7.5) > 1e-9 {
+		t.Fatalf("clips %v %v %v", w[0].ClipDur, w[1].ClipDur, w[2].ClipDur)
+	}
+}
+
+func TestFitAudioPinMustLeaveAShare(t *testing.T) {
+	pin := 20.0
+	d := &doc.Document{
+		Timing:   doc.Timing{Policy: "fit-audio"},
+		Defaults: defaults(),
+		Slots: []doc.Slot{
+			{Src: "a.jpg", Mode: "hold", Dur: &pin},
+			{Src: "b.jpg", Mode: "hold"},
+		},
+	}
+	_, _, err := Resolve(d, d.Slots, 20)
+	if err == nil {
+		t.Fatal("expected the remaining picture to be too short")
+	}
+}
+
 func TestMarkers(t *testing.T) {
 	pct := doc.TimePoint{Kind: "pct", Pct: 18, Of: "song"}
 	sec := doc.TimePoint{Kind: "sec", Sec: 92.4, Of: "song"}

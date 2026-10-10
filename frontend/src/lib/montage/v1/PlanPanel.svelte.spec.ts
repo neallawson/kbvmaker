@@ -11,12 +11,24 @@ function client(): Client {
 		async version() {
 			return { montage: 1 };
 		},
+		async audio() {
+			return { seconds: 1 };
+		},
 		async plan(document) {
 			if (document === 'missing.montage.json') {
 				throw new RuleError(0, 'missing-media', 'document missing');
 			}
 			return { montage: 1, duration: 4, slots: [{ src: 'a.jpg', clipDur: 4 }] };
-		}
+		},
+		async planBody() {
+			return { montage: 1, duration: 4, slots: [] };
+		},
+		async read() {
+			return { montage: 1 };
+		},
+		async save() {},
+		async exportScript() {},
+		async render() {}
 	};
 }
 

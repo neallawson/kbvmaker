@@ -16,10 +16,21 @@ type Command struct {
 }
 
 // Options controls binary names and how large one xfade graph may be.
+// Verbose keeps ffmpeg's banner and warnings; otherwise only errors and the
+// progress line are printed.
 type Options struct {
 	FFmpeg        string
 	FFProbe       string
 	MaxJoinInputs int
+	Verbose       bool
+}
+
+// ffmpeg starts an ffmpeg argv that overwrites its output.
+func (o Options) ffmpeg() []string {
+	if o.Verbose {
+		return []string{o.FFmpeg, "-y"}
+	}
+	return []string{o.FFmpeg, "-hide_banner", "-loglevel", "error", "-stats", "-y"}
 }
 
 func (o Options) norm() Options {
@@ -57,7 +68,7 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 		path := fmt.Sprintf("work/canvas-%d.png", n)
 		canvasOf[key] = path
 		n++
-		args := []string{opt.FFmpeg, "-y", "-i", s.Src}
+		args := append(opt.ffmpeg(), "-i", s.Src)
 		if s.Backdrop.Kind == "image" {
 			args = append(args, "-i", s.Backdrop.Src)
 		}
@@ -67,14 +78,14 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 	clips := make([]string, len(p.Slots))
 	for i, s := range p.Slots {
 		clips[i] = fmt.Sprintf("work/clip-%03d.mp4", i)
-		cmds = append(cmds, Command{Stage: "clip", Argv: []string{
-			opt.FFmpeg, "-y", "-loop", "1", "-framerate", strconv.Itoa(p.Output.FPS),
+		cmds = append(cmds, Command{Stage: "clip", Argv: append(opt.ffmpeg(),
+			"-loop", "1", "-framerate", strconv.Itoa(p.Output.FPS),
 			"-i", canvasOf[canvasKey(s)],
 			"-vf", zoomFilter(s, p.Output),
 			"-t", num(s.ClipDur),
 			"-c:v", p.Output.VideoCodec, "-preset", p.Output.Preset, "-crf", num(p.Output.CRF),
 			clips[i],
-		}})
+		)})
 	}
 	video := clips[0]
 	if len(p.Slots) > 1 {
@@ -103,13 +114,13 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 		cmds = append(cmds, joinCmds...)
 		video = final.path
 	}
-	cmds = append(cmds, Command{Stage: "mux", Argv: []string{
-		opt.FFmpeg, "-y", "-i", video, "-i", p.Audio,
+	cmds = append(cmds, Command{Stage: "mux", Argv: append(opt.ffmpeg(),
+		"-i", video, "-i", p.Audio,
 		"-map", "0:v:0", "-map", "1:a:0",
 		"-c:v", "copy", "-c:a", p.Output.AudioCodec, "-b:a", strconv.Itoa(p.Output.AudioBitrate),
 		"-shortest", "-movflags", "+faststart",
 		p.OutputFile,
-	}})
+	)})
 	return cmds, nil
 }
 
@@ -220,7 +231,7 @@ func joinAll(cmds *[]Command, nodes []node, joins []float64, opt Options, name f
 		return nodes[0], nil
 	}
 	if len(nodes) <= opt.MaxJoinInputs {
-		return emitJoin(cmds, nodes, joins, name, p, opt.FFmpeg), nil
+		return emitJoin(cmds, nodes, joins, name, p, opt.ffmpeg()), nil
 	}
 	var mids []node
 	var midJoins []float64
@@ -246,7 +257,7 @@ func joinAll(cmds *[]Command, nodes []node, joins []float64, opt Options, name f
 	return joinAll(cmds, mids, midJoins, opt, name, p)
 }
 
-func emitJoin(cmds *[]Command, nodes []node, joins []float64, name func() string, p *model.Plan, ff string) node {
+func emitJoin(cmds *[]Command, nodes []node, joins []float64, name func() string, p *model.Plan, start []string) node {
 	starts := make([]float64, len(nodes))
 	t := 0.0
 	for i := range nodes {
@@ -274,7 +285,7 @@ func emitJoin(cmds *[]Command, nodes []node, joins []float64, name func() string
 			left, i+1, num(joins[i]), num(starts[i+1]), label)
 	}
 	out := name()
-	argv := []string{ff, "-y"}
+	argv := start
 	for _, n := range nodes {
 		argv = append(argv, "-i", n.path)
 	}

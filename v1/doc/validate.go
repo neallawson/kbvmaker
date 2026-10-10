@@ -23,11 +23,21 @@ var anchors = map[string]struct{}{
 }
 
 // Validate checks the document shape. It does not read media.
+// A document that plan or render can run has a song and at least one picture source.
 func (d *Document) Validate() error {
+	if err := d.ValidateShape(); err != nil {
+		return err
+	}
+	return d.ready()
+}
+
+// ValidateShape checks an edit the window may save before it can render.
+// The song and the picture list may still be empty.
+func (d *Document) ValidateShape() error {
 	if d.Montage != 1 {
 		return rule.E(0, "bad-number", "montage version %d", d.Montage)
 	}
-	if d.Audio == "" || IsURL(d.Audio) {
+	if IsURL(d.Audio) {
 		return rule.E(0, "missing-field", "audio")
 	}
 	if d.Defaults.Join.Type != "fade" {
@@ -76,9 +86,6 @@ func (d *Document) Validate() error {
 			return err
 		}
 	}
-	if len(d.Slots) == 0 && d.Pool == nil {
-		return rule.E(0, "missing-field", "slots or pool")
-	}
 	if d.Timing.Policy == "markers" && d.Pool != nil && len(d.Slots) == 0 {
 		return rule.E(0, "pool", "markers needs authored slots")
 	}
@@ -109,7 +116,29 @@ func (d *Document) Validate() error {
 			return err
 		}
 	}
+	return d.pins()
+}
+
+func (d *Document) ready() error {
+	if d.Audio == "" {
+		return rule.E(0, "missing-field", "audio")
+	}
+	if len(d.Slots) == 0 && d.Pool == nil {
+		return rule.E(0, "missing-field", "slots or pool")
+	}
 	return nil
+}
+
+func (d *Document) pins() error {
+	if d.Timing.Policy != "fit-audio" || len(d.Slots) < 2 {
+		return nil
+	}
+	for _, s := range d.Slots {
+		if s.Dur == nil {
+			return nil
+		}
+	}
+	return rule.E(len(d.Slots), "bad-time", "leave one picture sharing the song")
 }
 
 func validatePool(p *Pool) error {
@@ -193,9 +222,13 @@ func validateSlot(d *Document, s Slot, slot int) error {
 		if s.Dur == nil || *s.Dur <= 0 {
 			return rule.E(slot, "bad-time", "explicit timing needs dur > 0")
 		}
+	case "fit-audio":
+		if s.Dur != nil && *s.Dur <= 0 {
+			return rule.E(slot, "bad-time", "dur %v", *s.Dur)
+		}
 	default:
 		if s.Dur != nil {
-			return rule.E(slot, "bad-time", "dur is only valid under explicit timing")
+			return rule.E(slot, "bad-time", "dur is only valid under fit-audio or explicit timing")
 		}
 	}
 	switch d.Timing.Policy {

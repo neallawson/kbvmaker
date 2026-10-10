@@ -90,11 +90,13 @@ Document {
 `montage` must be the integer `1`.
 
 `audio` is the soundtrack. The song length is the container duration reported
-by ffprobe.
+by ffprobe. The editor may omit `audio` while a project is still being
+assembled. `plan` and `render` reject a document with no audio.
 
 The document has `slots`, or `pool`, or both only in the way Baking
-describes. A document with neither is rejected. `schedule` is present only
-when `pool` is present.
+describes. The editor may omit both while a project is still being
+assembled. `plan` and `render` reject a document with neither. `schedule`
+is present only when `pool` is present.
 
 `timing` omitted means `{ "policy": "fit-audio" }`.
 
@@ -284,8 +286,10 @@ segment. `basedOn` is allowed only with `motion`. The engine does not render
 slot was detached from a mode.
 
 `hold` is allowed only with `mode`. It replaces `defaults.hold` when that
-mode is expanded. `dur` on a slot is allowed only under timing policy
-`explicit`. `until` is allowed only under `markers`.
+mode is expanded. `dur` on a slot is a clip length in seconds. It is
+required under `explicit`. Under `fit-audio` it is optional and means that
+picture's length is pinned; slots that omit it share the rest of the song
+(section 7.1). `until` is allowed only under `markers`.
 
 Mode names, including keys of `modes`, match `[a-z0-9]+(-[a-z0-9]+)*`.
 
@@ -393,11 +397,30 @@ join to share one duration; per-slot join overrides belong to `markers` and
 clipDur = (D + (N - 1) * x) / N
 ```
 
-On the output timeline the fade between slot `i` and slot `i+1` starts at
-`(i + 1) * (clipDur - x)` and lasts `x`. This is the script's chain. The
-authored quantity is the even split, not the midpoint of the dissolve.
+A slot may set `dur` to a clip length in seconds, `> 0`. That length is a
+pin. The file stores only the pins. The shared lengths are recomputed and
+are not written back.
 
-Output duration is `N * clipDur - (N - 1) * x`, which equals `D`.
+Let `P` be the sum of the pins and `k` the number of pins. When `N > 1`,
+`k` must be less than `N`, so one picture still absorbs the song:
+
+```
+shared = (D + (N - 1) * x - P) / (N - k)
+```
+
+Every pin is `> x`, and `shared` is `> x`. Slots that omit `dur` use
+`shared`. When `k` is 0 this is the even split above.
+
+When `N` is 1 the clip is `D`. A `dur` on that only slot is rejected unless
+it equals `D`.
+
+On the output timeline the fade between slot `i` and slot `i+1` starts at
+the next slot's start and lasts `x`. With equal clips that start is
+`(i + 1) * (clipDur - x)`. The authored quantity is the clip length, not
+the midpoint of the dissolve.
+
+Output duration is the sum of the clip lengths minus `(N - 1) * x`, which
+equals `D`.
 
 ### 7.2 fixed-clip
 

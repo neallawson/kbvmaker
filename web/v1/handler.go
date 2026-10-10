@@ -3,12 +3,15 @@
 package v1
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
 
 	engine "neal/kbvmaker/v1"
+	"neal/kbvmaker/v1/compile"
+	"neal/kbvmaker/v1/doc"
 	"neal/kbvmaker/v1/media"
 	"neal/kbvmaker/v1/rule"
 )
@@ -22,36 +25,59 @@ type Handler struct {
 // Register mounts the Montage 1 routes on mux.
 func (h Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/version", h.version)
+	mux.HandleFunc("POST /v1/audio", h.audio)
 	mux.HandleFunc("POST /v1/plan", h.plan)
+	mux.HandleFunc("POST /v1/document", h.document)
+	mux.HandleFunc("POST /v1/export-script", h.exportScript)
+	mux.HandleFunc("POST /v1/render", h.render)
 }
 
 func (h Handler) version(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]int{"montage": engine.Version})
 }
 
+type audioRequest struct {
+	Path string `json:"path"`
+}
+
+func (h Handler) audio(w http.ResponseWriter, r *http.Request) {
+	var req audioRequest
+	if !decodeRequest(w, r, &req) {
+		return
+	}
+	if req.Path == "" {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "path"))
+		return
+	}
+	seconds, err := h.Probe.Duration(r.Context(), req.Path)
+	if err != nil {
+		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "audio %s", req.Path))
+		return
+	}
+	if seconds <= 0 {
+		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "song duration %v", seconds))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]float64{"seconds": seconds})
+}
+
 type planRequest struct {
-	Document string `json:"document"`
+	Document string          `json:"document"`
+	Body     json.RawMessage `json:"body"`
+	Dir      string          `json:"dir"`
 }
 
 func (h Handler) plan(w http.ResponseWriter, r *http.Request) {
 	var req planRequest
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "request body"))
+	if !decodeRequest(w, r, &req) {
 		return
 	}
-	if req.Document == "" {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "document"))
+	if len(req.Body) > 0 && string(req.Body) != "null" && req.Document != "" {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "unknown-field", "document and body"))
 		return
 	}
-	d, err := engine.Load(req.Document)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "document %s", req.Document))
-			return
-		}
-		writeRule(w, http.StatusUnprocessableEntity, err)
+	d, ok := h.loadPlan(w, req)
+	if !ok {
 		return
 	}
 	p, err := engine.New(h.Probe).Resolve(r.Context(), d)
@@ -60,6 +86,175 @@ func (h Handler) plan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
+}
+
+type documentRequest struct {
+	Document string          `json:"document"`
+	Body     json.RawMessage `json:"body"`
+}
+
+func (h Handler) document(w http.ResponseWriter, r *http.Request) {
+	var req documentRequest
+	if !decodeRequest(w, r, &req) {
+		return
+	}
+	if req.Document == "" {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "document"))
+		return
+	}
+	if len(req.Body) > 0 && string(req.Body) != "null" {
+		h.writeDocument(w, req)
+		return
+	}
+	b, err := os.ReadFile(req.Document)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "document %s", req.Document))
+			return
+		}
+		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "%s", err.Error()))
+		return
+	}
+	if _, err := doc.Decode(b); err != nil {
+		writeRule(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(b)
+}
+
+func (h Handler) writeDocument(w http.ResponseWriter, req documentRequest) {
+	d, err := doc.Decode(req.Body)
+	if err != nil {
+		writeRule(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	if err := d.ValidateShape(); err != nil {
+		writeRule(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, req.Body, "", "  "); err != nil {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "request body"))
+		return
+	}
+	buf.WriteByte('\n')
+	if err := os.WriteFile(req.Document, buf.Bytes(), 0o644); err != nil {
+		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "%s", err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+type fileRequest struct {
+	Document string `json:"document"`
+	File     string `json:"file"`
+}
+
+func (h Handler) exportScript(w http.ResponseWriter, r *http.Request) {
+	var req fileRequest
+	if !decodeRequest(w, r, &req) {
+		return
+	}
+	cmds, _, ok := h.commands(w, r, req.Document)
+	if !ok {
+		return
+	}
+	script := engine.ExportScript(cmds)
+	if req.File == "" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(script))
+		return
+	}
+	if err := os.WriteFile(req.File, []byte(script), 0o644); err != nil {
+		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "%s", err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (h Handler) render(w http.ResponseWriter, r *http.Request) {
+	var req fileRequest
+	if !decodeRequest(w, r, &req) {
+		return
+	}
+	cmds, dir, ok := h.commands(w, r, req.Document)
+	if !ok {
+		return
+	}
+	if err := engine.Run(r.Context(), dir, cmds); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"slot": 0, "code": "render", "message": err.Error(),
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (h Handler) loadPlan(w http.ResponseWriter, req planRequest) (*doc.Document, bool) {
+	if len(req.Body) > 0 && string(req.Body) != "null" {
+		d, err := doc.Decode(req.Body)
+		if err != nil {
+			writeRule(w, http.StatusUnprocessableEntity, err)
+			return nil, false
+		}
+		d.Dir = req.Dir
+		return d, true
+	}
+	if req.Document == "" {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "document"))
+		return nil, false
+	}
+	d, err := engine.Load(req.Document)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "document %s", req.Document))
+			return nil, false
+		}
+		writeRule(w, http.StatusUnprocessableEntity, err)
+		return nil, false
+	}
+	return d, true
+}
+
+func (h Handler) commands(w http.ResponseWriter, r *http.Request, path string) ([]compile.Command, string, bool) {
+	if path == "" {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "document"))
+		return nil, "", false
+	}
+	d, err := engine.Load(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "document %s", path))
+			return nil, "", false
+		}
+		writeRule(w, http.StatusUnprocessableEntity, err)
+		return nil, "", false
+	}
+	eng := engine.New(h.Probe)
+	p, err := eng.Resolve(r.Context(), d)
+	if err != nil {
+		writeRule(w, http.StatusUnprocessableEntity, err)
+		return nil, "", false
+	}
+	cmds, err := eng.Compile(p)
+	if err != nil {
+		writeRule(w, http.StatusUnprocessableEntity, err)
+		return nil, "", false
+	}
+	return cmds, d.Dir, true
+}
+
+func decodeRequest(w http.ResponseWriter, r *http.Request, dest any) bool {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dest); err != nil {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "request body"))
+		return false
+	}
+	return true
 }
 
 func writeRule(w http.ResponseWriter, status int, err error) {

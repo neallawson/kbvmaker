@@ -8,7 +8,7 @@ The application is kbvmaker. The file format is Montage. A usual project file is
 
 Montage 1 and the Go engine that loads it are in this tree. The command line can print the resolved plan, export a bash script, export the same commands as JSON, or render.
 
-The window and the local browser are two hosts of one Svelte client. Both call the Go API at `/v1`. The shape is in `IDEAS.md` under Hosts. A multi-session site is later. The resolution rules stay in the `v1` packages.
+The window and the local browser are two hosts of one Svelte client. Both call the Go API at `/v1`. The editor creates a Montage, lists the pictures, and shows a read-only score of the plan. The shape is in `IDEAS.md` under Editor and Hosts. A multi-session site is later. The resolution rules stay in the `v1` packages.
 
 `make_Greenhouse_video_v3.sh` is the first Greenhouse tape, kept as a reference. It is not the application.
 
@@ -26,6 +26,8 @@ Where `IDEAS.md` and `montage-v1.md` disagree, the specification wins.
 
 Go 1.23. ffmpeg and ffprobe on `PATH` for probing media and for `render`. `go test ./...` skips the short render when ffmpeg is absent.
 
+The window on Linux needs WebKitGTK and python3 with GTK 3 (`python3-gi`) for the file dialogs. Releases target Ubuntu 22.04 or newer with `libwebkit2gtk-4.1-dev`. Older systems with only `libwebkit2gtk-4.0-dev` can build the window for development.
+
 ## Commands
 
 ```
@@ -36,10 +38,13 @@ kbvmaker export-script file.montage.json
 kbvmaker export-plan   file.montage.json
 kbvmaker render        file.montage.json
 kbvmaker serve
-go build -tags production -o kbvmaker-window ./cmd/desktop
+
+pnpm --dir frontend build
+go build -tags production,webkit2_41 -o kbvmaker-window ./cmd/desktop   # WebKitGTK 4.1
+go build -tags production -o kbvmaker-window ./cmd/desktop              # WebKitGTK 4.0
 ```
 
-`plan` prints the resolved timeline. `export-script` and `export-plan` print ffmpeg argument lists, as bash and as a `renderPlan` JSON document. `render` runs those commands with the Montage file's directory as the working directory and writes intermediate files under `work/`. `serve` listens on `127.0.0.1:8787` and exposes `/v1`. Pass `-addr` to change the address, and `-static frontend/build` to serve the client from the same origin. `kbvmaker-window` opens that client in a Wails window and adds a native file dialog. Build the client first.
+The generated ffmpeg commands print only errors and the progress line. Pass `-verbose` before the file (for example `kbvmaker render -verbose file.montage.json`) to keep ffmpeg's banner and warnings. `plan` prints the resolved timeline. `export-script` and `export-plan` print ffmpeg argument lists, as bash and as a `renderPlan` JSON document. `render` runs those commands with the Montage file's directory as the working directory and writes intermediate files under `work/`. `serve` listens on `127.0.0.1:8787` and exposes `/v1`. Pass `-addr` to change the address, and `-static frontend/build` to serve the client from the same origin. `kbvmaker-window` opens that client in a Wails window and adds a native file dialog. Build the client first.
 
 ## Layout
 

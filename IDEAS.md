@@ -228,7 +228,9 @@ build can do zoompan, xfade, and gblur, and surfaces the real ffmpeg error.
 Packaging a private ffmpeg is a later distribution choice.
 
 On Linux, Wails needs WebKitGTK. That is the packaging cost. Windows
-WebView2 and macOS WKWebView are quieter.
+WebView2 and macOS WKWebView are quieter. A release targets Ubuntu 22.04 or
+newer with `libwebkit2gtk-4.1`, built with the `webkit2_41` tag. The older
+4.0 build keeps working for development but is not promised.
 
 The GUI earns its keep with a plan preview: slot count, clip length,
 per-photo fill zoom, and which end of the move is the whole photo, including
@@ -758,9 +760,9 @@ look selected, and renders. That writes a complete document: slots in the
 order the images were loaded, a plain move on each slot, a fill, a dissolve,
 and a timing policy. A person who never opens a picture still gets a video.
 
-The long path starts from that file. Reorder the filmstrip. Pick a different
-look, a different fill, or a different move between pictures. Open one
-picture only when that one picture should differ. Save a combination that
+The long path starts from that file. Reorder the picture list. Pick a
+different look, a different fill, or a different move on one picture. Set a
+length on one picture when the even split is wrong. Save a combination that
 worked under a name. The file on disk is the edit, not a pointer back at the
 preset that started it.
 
@@ -939,14 +941,15 @@ picks the name.
 Shipped Looks, each a small document fragment. Three of them are enough for
 the first screen. The rest sit under More looks.
 
-- **Classic.** The suggested one. `fit-audio`, a moderate dissolve, a short
-  hold, a modest zoom span, black bars, output `1920×1080`. Assignment
-  alternates slow zoom in and slow zoom out. Load, render, done.
+- **Classic.** The suggested one. `fit-audio`, dissolve `1`, hold `0.5`,
+  zoom span `0.25`, black bars, output `1920×1080`. Assignment alternates
+  slow zoom in and slow zoom out. Load, render, done.
 - **Photo film.** The shell script. `fit-audio`, fade `1.5`, hold `1`, zoom
   span `0.4`, blurred photo, same output size. Assignment cycles slow zoom
   in, pan across, drift down, slow zoom out.
-- **Quick slides.** `fixed-clip` around five seconds, a shorter dissolve,
-  black bars, a cycle of the gentle zoom-ins.
+- **Quick slides.** `fixed-clip` of `5` seconds, dissolve `0.5`, hold `0`,
+  zoom span `0.2`, black bars. Every picture is a slow zoom in. Pins are
+  cleared, because this Look gives every picture the same length.
 
 Further Looks, not on the first row:
 
@@ -989,23 +992,87 @@ Classic" and then changing the shipped preset underneath old files would
 make a saved edit drift. The library holds the template. The file holds the
 values.
 
+### Picture length
+
+The song is the clock. `fit-audio` still makes the video the length of the
+song. A picture with no `dur` shares that song with the other unpinned
+pictures. The number the list shows for an unpinned picture is the resolved
+clip length, and it is not written into the file.
+
+Typing a length stores `dur` on that slot only. The other unpinned pictures
+divide what remains, overlaps included. Clearing the box removes `dur` and
+puts the picture back in the share. A project with more than one picture
+keeps at least one picture unpinned. A pin has to leave every remaining
+picture longer than the dissolve. When it does not, the plan error names
+that picture.
+
+One picture is the whole song. Its length is shown and is not editable.
+
+The score draws these resolved lengths. It does not edit them.
+
+### Editor
+
+One Montage file is the project. New starts from Classic in memory and does
+not ask for a file. Save asks where to write `name.montage.json`. Open reads
+a Montage that already exists. There is no second settings file.
+
+The picture list is the editor. Adding pictures appends them in the order
+they were picked. That order is the slot list, and it is what a later
+rebuild uses. Sort by name, move up, and move down each write that list
+once. A new file appearing in a folder does not reorder anything.
+
+The score is read-only. Each picture appears on it as soon as it is added,
+at an equal width. When the song is known, the same blocks take their clip
+lengths and the dissolves show as overlaps. Selecting a row highlights that
+block. Clicking a block only selects the same row. The song's length, in
+minutes:seconds and in seconds, sits beside its name. A file dialog opens
+again in the folder it used last.
+
+The selected row sets the move by its plain name, and the length box
+described above. Remove and replace change that picture's file. Shuffle
+pictures reorders the list once. Shuffle moves assigns each picture one of
+the plain moves once. Both write the result into the slots. Neither draws
+zoom numbers, and neither changes again on the next open.
+
+Looks are Classic, Photo film, and Quick slides. Classic is selected for a
+new project. Applying a Look writes its defaults and a mode on every
+picture. It does not rename the file to the Look.
+
+- **Classic.** `fit-audio`, dissolve `1`, hold `0.5`, zoom span `0.25`,
+  black bars, output `1920×1080`. Modes alternate slow zoom in and slow
+  zoom out.
+- **Photo film.** `fit-audio`, dissolve `1.5`, hold `1`, zoom span `0.4`,
+  blurred photo, same output size. Modes cycle slow zoom in, pan across,
+  drift down, slow zoom out.
+- **Quick slides.** `fixed-clip` of `5` seconds, dissolve `0.5`, hold `0`,
+  zoom span `0.2`, black bars. Every picture is slow zoom in. Pins are
+  cleared, because this Look gives every picture the same length.
+
+Save writes the Montage, including a project that does not yet have a song
+or a picture. Export shell script and Render both save first. Each asks
+where its file should go. Render shows the ffmpeg log when a command fails.
+Unsaved edits are visible. An engine error names the picture it belongs to.
+
+Enter and exit stills, a per-picture fill, and a live ffmpeg stream are not
+part of this screen yet. The length box and the move name are the picture
+edit.
+
 ### Screens
 
-One screen for the short path. The pictures, the song, a few Looks with one
-already selected, and Render. A line under the Look says how it will come
-out, in plain words: how many pictures, about how long each one stays, and
-that it dissolves between them. That is the check before a render. It does
-not mention zoom span or fill zoom.
+One screen. New or Open, the song, the picture list, three Looks with one
+selected, the read-only score, and Save, Export shell script, and Render.
+A line under the score says how it will come out, in plain words: how many
+pictures, about how long each one stays, and that it dissolves between them.
+That is the check before a render. It does not mention zoom span or fill zoom.
 
-More is where the other presets are: more Looks, the fill names, the
-transition names, the move names applied to every picture. Still names, still
-one choice each.
+More, when it is built, is where the other presets are: more Looks, the fill
+names, the transition names. Still names, still one choice each.
 
-The picture editor opens from the filmstrip for one frame that should
-differ. It starts on the same move names. More on that picture is the two
-stills, enter and exit, a drag point, and the zoom choices. Hold and a
-different transition after this picture sit there too. The window detaches
-the picture when those change, and keeps the old preset name visible.
+The picture row starts on the move names and the length box. More on that
+picture will be the two stills, enter and exit, a drag point, and the zoom
+choices. Hold and a different transition after this picture sit there too.
+The window detaches the picture when those change, and keeps the old preset
+name visible.
 
 Render progress is the ffmpeg log, unfiltered. The window does not invent a
 percent complete from a swallowed stderr.
@@ -1032,6 +1099,14 @@ CLI does.
 
 Wails is a window onto that server, plus the native open and save dialogs a
 browser cannot provide. It does not grow a second set of engine calls.
+
+The window does not send `/v1` with fetch. WebKitGTK before 2.40 drops POST
+bodies on the Wails asset server, so a save arrives empty. One binding,
+`API.Call(method, path, body)`, hands the request to the same `/v1` handler
+and returns its status and body. The client builds the same requests in
+both hosts; only the transport differs. This path is kept on every platform,
+not only old Linux, so the window has one way to reach `/v1` and the tests
+cover it.
 Server-sent events carry the ffmpeg log, so render progress is the same in
 both hosts.
 

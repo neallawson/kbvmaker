@@ -6,7 +6,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -14,31 +13,10 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"neal/kbvmaker/v1/media"
 	"neal/kbvmaker/web"
 )
-
-// Dialogs is the only Wails binding. The screens call /v1 for everything else.
-type Dialogs struct {
-	ctx context.Context
-}
-
-func (d *Dialogs) startup(ctx context.Context) {
-	d.ctx = ctx
-}
-
-// OpenMontage asks for a project file and returns its path.
-// An empty path means the dialog was cancelled.
-func (d *Dialogs) OpenMontage() (string, error) {
-	return runtime.OpenFileDialog(d.ctx, runtime.OpenDialogOptions{
-		Title: "Open Montage",
-		Filters: []runtime.FileFilter{
-			{DisplayName: "Montage", Pattern: "*.montage.json;*.json"},
-		},
-	})
-}
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -61,6 +39,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	handler := web.Server{Probe: probe}.Handler()
 	dialogs := &Dialogs{}
 	return wails.Run(&options.App{
 		Title:  "kbvmaker",
@@ -68,9 +47,9 @@ func run(args []string) error {
 		Height: 760,
 		AssetServer: &assetserver.Options{
 			Assets:  os.DirFS(*static),
-			Handler: web.Server{Probe: probe}.Handler(),
+			Handler: handler,
 		},
 		OnStartup: dialogs.startup,
-		Bind:      []interface{}{dialogs},
+		Bind:      []interface{}{dialogs, &API{handler: handler}},
 	})
 }

@@ -47,4 +47,4 @@ The render test in `v1/render_test.go` writes a PNG and a short WAV, renders a h
 
 ## Out of scope unless asked
 
-Do not commit, push, or open a pull request. Do not add session management or a second engine binding for Wails. Flag overrides exist as `doc.ApplyOverrides` and are not wired to the CLI yet. Baking a generated schedule back into a Montage file is not a user-facing function yet. Creative rotation and skew stay out of version 1.
+Do not commit, push, or open a pull request. Do not add session management or a second engine binding for Wails. The window's only non-dialog binding is `API.Call`, which carries `/v1` requests to the same handler because older WebKitGTK drops POST bodies. Flag overrides exist as `doc.ApplyOverrides` and are not wired to the CLI yet. Baking a generated schedule back into a Montage file is not a user-facing function yet. Creative rotation and skew stay out of version 1.

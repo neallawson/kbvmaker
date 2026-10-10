@@ -29,18 +29,24 @@ func run(args []string) error {
 	if args[0] == "serve" {
 		return serve(args[1:])
 	}
-	if len(args) < 2 {
-		return fmt.Errorf("usage: kbvmaker plan|export-script|export-plan|render file.montage.json | serve")
+	fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
+	verbose := fs.Bool("verbose", false, "keep ffmpeg's banner and warnings")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if fs.NArg() < 1 {
+		return fmt.Errorf("usage: kbvmaker plan|export-script|export-plan|render [-verbose] file.montage.json | serve")
 	}
 	probe, err := media.NewFFProbe()
 	if err != nil {
 		return err
 	}
-	d, err := v1.Load(args[1])
+	d, err := v1.Load(fs.Arg(0))
 	if err != nil {
 		return err
 	}
 	eng := v1.New(probe)
+	eng.Options.Verbose = *verbose
 	ctx := context.Background()
 	p, err := eng.Resolve(ctx, d)
 	if err != nil {

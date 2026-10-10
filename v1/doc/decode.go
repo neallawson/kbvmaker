@@ -110,10 +110,9 @@ func (r rawDoc) document() (*Document, error) {
 		return nil, rule.E(0, "bad-number", "montage version %v", *r.Montage)
 	}
 	d := &Document{Montage: version.Current}
-	if r.Audio == nil || *r.Audio == "" {
-		return nil, rule.E(0, "missing-field", "audio")
+	if r.Audio != nil {
+		d.Audio = *r.Audio
 	}
-	d.Audio = *r.Audio
 	d.Canvas = Canvas{Width: 3840, Height: 2160, Backdrop: blurBackdrop(40)}
 	if c := r.Canvas; c != nil {
 		if c.Width != nil {
