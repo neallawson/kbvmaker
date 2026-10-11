@@ -14,6 +14,7 @@
 		removeSlot,
 		replaceSrc,
 		scoreBlocks,
+		scoreJoins,
 		secondsLabel,
 		setAudio,
 		songClock,
@@ -319,6 +320,9 @@
 		return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 	}
 
+	let blocks = $derived(scoreBlocks(doc?.slots, plan));
+	let joins = $derived(scoreJoins(blocks));
+
 	function sharesSong(file: MontageFile): boolean {
 		return (file.timing?.policy ?? 'fit-audio') === 'fit-audio';
 	}
@@ -411,22 +415,40 @@
 				<Button variant="outline" onclick={() => edit(shuffleMoves(doc!))}>Shuffle moves</Button>
 			</div>
 
-			<div class="bg-muted relative h-16 overflow-hidden rounded-md" role="group" aria-label="Score">
-				{#each scoreBlocks(doc.slots, plan) as block, index (block.src + index)}
-					<button
-						type="button"
-						class="absolute top-1 h-14 overflow-hidden rounded border px-1 text-left text-xs {selected === index
-							? 'border-primary bg-background z-10'
-							: 'bg-background/80 border-transparent'}"
-						style="left: {block.left}%; width: {block.width}%"
-						aria-pressed={selected === index}
-						onclick={() => choose(index)}
-					>
-						{baseName(block.src)}
-					</button>
-				{:else}
-					<p class="text-muted-foreground p-2 text-sm">Each picture shows up here as you add it.</p>
-				{/each}
+			<div class="flex flex-col gap-1" role="group" aria-labelledby="timeline-label">
+				<p id="timeline-label" class="text-sm font-medium">Timeline</p>
+				<div class="border-foreground/15 bg-foreground/10 relative h-16 overflow-hidden rounded-md border">
+					{#each blocks as block, index (block.src + index)}
+						<button
+							type="button"
+							class="mark absolute top-1 flex h-14 items-center justify-center overflow-hidden text-xs {selected === index
+								? 'bg-primary text-primary-foreground z-10'
+								: 'bg-[oklch(0.78_0_0)] text-foreground z-0'}"
+							style="left: {block.left}%; width: {block.width}%"
+							title={baseName(block.src)}
+							aria-label="{index + 1}. {baseName(block.src)}"
+							aria-pressed={selected === index}
+							onclick={() => choose(index)}
+						>
+							<span class="mark-n">{index + 1}</span>
+						</button>
+					{:else}
+						<p class="text-muted-foreground p-2 text-sm">Each picture shows up here as you add it.</p>
+					{/each}
+					{#each joins as join, index (join.left + '-' + index)}
+						<div
+							class="pointer-events-none absolute top-1 z-20 h-14 bg-[oklch(0.5_0_0)]"
+							style="left: {join.left}%; width: {join.width}%"
+							data-join
+						></div>
+					{/each}
+				</div>
+				{#if plan}
+					<div class="text-muted-foreground flex justify-between text-xs tabular-nums">
+						<span>0:00</span>
+						<span>{clock(Math.round(plan.duration))}</span>
+					</div>
+				{/if}
 			</div>
 			{#if plan}
 				<p>{describePlan(plan)}</p>
@@ -524,3 +546,17 @@
 		<p role="alert">{error}</p>
 	{/if}
 </main>
+
+<style>
+	.mark {
+		container-type: inline-size;
+	}
+	.mark-n {
+		display: none;
+	}
+	@container (min-width: 1.25rem) {
+		.mark-n {
+			display: block;
+		}
+	}
+</style>

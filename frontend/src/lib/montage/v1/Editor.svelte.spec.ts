@@ -72,16 +72,18 @@ describe('Editor', () => {
 		expect(screen.getByText('Each picture shows up here as you add it.')).toBeTruthy();
 	});
 
-	it('shows a picture on the score before a song is chosen', async () => {
+	it('shows a picture on the timeline before a song is chosen', async () => {
 		const user = userEvent.setup();
 		render(Editor, { client: client().client, host: browser });
 		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
 		await user.click(screen.getByRole('button', { name: 'New' }));
 		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
 		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
-		expect(
-			await within(screen.getByRole('group', { name: 'Score' })).findByRole('button', { name: 'a.jpg' })
-		).toBeTruthy();
+		const mark = await within(screen.getByRole('group', { name: 'Timeline' })).findByRole('button', {
+			name: '1. a.jpg'
+		});
+		expect(mark.getAttribute('title')).toBe('a.jpg');
+		expect(mark.textContent?.trim()).toBe('1');
 	});
 
 	it('shows the song length beside its name', async () => {
@@ -132,9 +134,11 @@ describe('Editor', () => {
 		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
 		await user.click(screen.getByRole('button', { name: 'Open' }));
 
-		const score = await within(await screen.findByRole('group', { name: 'Score' })).findByRole('button', {
-			name: 'b.jpg'
-		});
+		const timeline = await screen.findByRole('group', { name: 'Timeline' });
+		expect(await within(timeline).findByText('0:00')).toBeTruthy();
+		expect(within(timeline).getByText('0:20')).toBeTruthy();
+		expect(timeline.querySelectorAll('[data-join]')).toHaveLength(1);
+		const score = await within(timeline).findByRole('button', { name: '2. b.jpg' });
 		await user.click(score);
 
 		const length = screen.getByRole('textbox', { name: 'Length in seconds' }) as HTMLInputElement;

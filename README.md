@@ -9,7 +9,7 @@ The GUI is kbvmaker-gui. This is a front-end, GUI-based, local application for c
 
 Montage 1 and the Go engine that loads it are in this tree. The command line checks a Montage, prints the resolved plan, exports the render as a bash script or as `renderPlan` JSON, and renders the video. It is built to run unattended in scripts and pipelines. It reads and renders Montage files but does not create or edit them yet.
 
-The GUI and the local browser are two hosts of one Svelte client. Both call the Go API at `/v1`. The editor creates and saves a Montage, lists the pictures in their saved order, pins picture lengths, applies looks, shows a read-only score of the plan, and exports a script or renders the video. The shape is in `IDEAS.md` under Editor and Hosts. A multi-session site is later. The resolution rules stay in the `v1` packages.
+The GUI and the local browser are two hosts of one Svelte client. Both call the Go API at `/v1`. The editor creates and saves a Montage, lists the pictures in their saved order, pins picture lengths, applies looks, shows a read-only timeline of the plan, and exports a script or renders the video. The shape is in `IDEAS.md` under Editor and Hosts. A multi-session site is later. The resolution rules stay in the `v1` packages.
 
 `make_Greenhouse_video_v3.sh` is the first Greenhouse tape, kept as a reference. It is not the application.
 
@@ -32,7 +32,7 @@ The GUI on Linux needs WebKitGTK, which brings GTK 3. The file dialogs are nativ
 
 ## GUI
 
-kbvmaker-gui is the editor. One screen holds the project, the song, a look, the pictures, and a read-only score of how the film will play. The same screens run in a browser. The GUI adds native file dialogs that reopen in the last folder used for that kind of file.
+kbvmaker-gui is the editor. One screen holds the project, the song, a look, the pictures, and a read-only timeline of how the film will play. The same screens run in a browser. The GUI adds native file dialogs that reopen in the last folder used for that kind of file.
 
 ```
 pnpm --dir frontend build
@@ -49,7 +49,7 @@ kbvmaker serve -static frontend/build
 
 ffmpeg runs on the machine that serves the page.
 
-![The editor: project, song, look, pictures, and the score](docs/gui.png)
+![The editor: project, song, look, pictures, and the timeline](docs/gui.png)
 
 ### Making a film
 
@@ -69,7 +69,7 @@ Quick slides gives every picture the same five seconds, so a length pinned on on
 
 **Add pictures** appends them in the order you picked (`jpg`, `jpeg`, `png`, or `webp`). That order is the film. **Sort by name**, **Move up**, and **Move down** rewrite it. A file that shows up later in a folder stays out of the film until you add it.
 
-The score shows each picture as soon as you add it. Before the song is known, the blocks are equal. After that, they take their clip lengths and the dissolves overlap. Click a block or a row to select that picture. The line under the score says how it will come out: how many pictures, about how long each one stays, and the dissolve between them.
+The timeline shows each picture as soon as you add it, as a block on a track. The block carries the picture's number when there is room, and the file name is its tooltip. Before the song is known, the blocks are equal. After that, they take their clip lengths, a darker band marks each dissolve, and the axis runs from 0:00 to the end of the film. The selected picture is filled solid. Click a block or a row to select that picture. The line under the timeline says how it will come out: how many pictures, about how long each one stays, and the dissolve between them.
 
 The selected picture sets its own move: Slow zoom in, Pan across, Drift down, Slow zoom out, or Hold still. When the pictures share the song and there are two or more, **Length in seconds** pins that picture and the others share what remains. **Share the rest** hands that time back. One picture runs for the whole song. Quick slides keeps one length for every picture, so the length box stays closed. **Replace** and **Remove** change that picture. **Shuffle pictures** reorders the list once. **Shuffle moves** assigns each picture one of the moves once. The next time the file opens, that order and those moves are what was saved.
 

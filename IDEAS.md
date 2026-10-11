@@ -1021,10 +1021,13 @@ they were picked. That order is the slot list, and it is what a later
 rebuild uses. Sort by name, move up, and move down each write that list
 once. A new file appearing in a folder does not reorder anything.
 
-The score is read-only. Each picture appears on it as soon as it is added,
-at an equal width. When the song is known, the same blocks take their clip
-lengths and the dissolves show as overlaps. Selecting a row highlights that
-block. Clicking a block only selects the same row. The song's length, in
+The timeline is read-only and labeled Timeline. Each picture appears on it
+as soon as it is added, at an equal width, as a solid block with its number
+when the block is wide enough. The file name is the block's tooltip. When
+the song is known, the blocks take their clip lengths, a darker band marks
+each dissolve, and the axis runs from 0:00 to the film's length. Selecting
+a row paints that block in the primary color. Clicking a block only selects
+the same row. The song's length, in
 minutes:seconds and in seconds, sits beside its name. A file dialog opens
 again in the folder it used last.
 
@@ -1060,8 +1063,8 @@ edit.
 ### Screens
 
 One screen. New or Open, the song, the picture list, three Looks with one
-selected, the read-only score, and Save, Export shell script, and Render.
-A line under the score says how it will come out, in plain words: how many
+selected, the read-only timeline, and Save, Export shell script, and Render.
+A line under the timeline says how it will come out, in plain words: how many
 pictures, about how long each one stays, and that it dissolves between them.
 That is the check before a render. It does not mention zoom span or fill zoom.
 

@@ -6,6 +6,7 @@ import {
 	newProject,
 	relativize,
 	scoreBlocks,
+	scoreJoins,
 	setAudio,
 	setDur,
 	shuffleMoves,
@@ -32,6 +33,13 @@ describe('score and song length', () => {
 		expect(blocks[0]).toMatchObject({ left: 0, width: 40 });
 		expect(blocks[1].left).toBeCloseTo(32.5);
 		expect(blocks[1].width).toBeCloseTo(67.5);
+		const [join] = scoreJoins(blocks);
+		expect(join.left).toBeCloseTo(32.5);
+		expect(join.width).toBeCloseTo(7.5);
+	});
+
+	it('draws no join when the pictures only meet', () => {
+		expect(scoreJoins(scoreBlocks([{ src: 'a.jpg' }, { src: 'b.jpg' }], null))).toEqual([]);
 	});
 
 	it('writes the song length as minutes:seconds and total seconds', () => {

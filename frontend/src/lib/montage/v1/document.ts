@@ -210,6 +210,24 @@ export function scoreBlocks(
 	return list.map((slot, index) => ({ src: slot.src, left: index * width, width }));
 }
 
+export interface ScoreJoin {
+	left: number;
+	width: number;
+}
+
+/** scoreJoins is the overlap of neighboring pictures: the dissolve on the timeline. */
+export function scoreJoins(blocks: ScoreBlock[]): ScoreJoin[] {
+	const joins: ScoreJoin[] = [];
+	for (let i = 0; i < blocks.length - 1; i++) {
+		const start = blocks[i + 1].left;
+		const end = blocks[i].left + blocks[i].width;
+		if (end > start + 0.05) {
+			joins.push({ left: start, width: end - start });
+		}
+	}
+	return joins;
+}
+
 /** songClock is minutes:seconds and the length in seconds. */
 export function songClock(seconds: number): string {
 	const total = Math.max(0, Math.round(seconds));
