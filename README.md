@@ -1,14 +1,15 @@
-# kbvmaker
+# kbvmaker - Ken Burns Video Maker
 
 kbvmaker composes a video from still images and a soundtrack. Motion, cuts, and dissolves are described in a Montage document. The engine resolves that document into a timeline and drives ffmpeg.
 
 The application is kbvmaker. The file format is Montage. A usual project file is `name.montage.json`.
+The GUI is kbvmaker-gui. This is a front-end, GUI-based, local application for creating and rendering Montage files.
 
 ## Status
 
 Montage 1 and the Go engine that loads it are in this tree. The command line checks a Montage, prints the resolved plan, exports the render as a bash script or as `renderPlan` JSON, and renders the video. It is built to run unattended in scripts and pipelines. It reads and renders Montage files but does not create or edit them yet.
 
-The window and the local browser are two hosts of one Svelte client. Both call the Go API at `/v1`. The editor creates and saves a Montage, lists the pictures in their saved order, pins picture lengths, applies looks, shows a read-only score of the plan, and exports a script or renders the video. The shape is in `IDEAS.md` under Editor and Hosts. A multi-session site is later. The resolution rules stay in the `v1` packages.
+The GUI and the local browser are two hosts of one Svelte client. Both call the Go API at `/v1`. The editor creates and saves a Montage, lists the pictures in their saved order, pins picture lengths, applies looks, shows a read-only score of the plan, and exports a script or renders the video. The shape is in `IDEAS.md` under Editor and Hosts. A multi-session site is later. The resolution rules stay in the `v1` packages.
 
 `make_Greenhouse_video_v3.sh` is the first Greenhouse tape, kept as a reference. It is not the application.
 
@@ -27,7 +28,54 @@ Where `IDEAS.md` and `montage-v1.md` disagree, the specification wins.
 
 Go 1.23. ffmpeg and ffprobe on `PATH` for probing media and for `render`. `go test ./...` skips the short render when ffmpeg is absent.
 
-The window on Linux needs WebKitGTK, which brings GTK 3. The file dialogs are native GTK, built with cgo against the same library, so nothing else is required. Windows and macOS use the Wails dialogs. Releases target Ubuntu 22.04 or newer with `libwebkit2gtk-4.1-dev`. Older systems with only `libwebkit2gtk-4.0-dev` can build the window for development.
+The GUI on Linux needs WebKitGTK, which brings GTK 3. The file dialogs are native GTK, built with cgo against the same library, so nothing else is required. Windows and macOS use the Wails dialogs. Releases target Ubuntu 22.04 or newer with `libwebkit2gtk-4.1-dev`. Older systems with only `libwebkit2gtk-4.0-dev` can build the GUI for development.
+
+## GUI
+
+kbvmaker-gui is the editor. One screen holds the project, the song, a look, the pictures, and a read-only score of how the film will play. The same screens run in a browser. The GUI adds native file dialogs that reopen in the last folder used for that kind of file.
+
+```
+pnpm --dir frontend build
+go build -tags production,webkit2_41 -o kbvmaker-gui ./cmd/desktop   # WebKitGTK 4.1
+go build -tags production -o kbvmaker-gui ./cmd/desktop              # WebKitGTK 4.0
+./kbvmaker-gui
+```
+
+Build the client before the GUI, and restart the GUI after rebuilding the client. The browser host types a path into the box instead of opening a dialog:
+
+```
+kbvmaker serve -static frontend/build
+```
+
+ffmpeg runs on the machine that serves the page.
+
+![The editor: project, song, look, pictures, and the score](docs/gui.png)
+
+### Making a film
+
+**New** starts a Classic project in memory. **Save** asks where to write it, and the dialog suggests `piece.montage.json`. **Open** reads a Montage that already exists. The header shows "Unsaved changes" until Save, then "Saved", and the path sits under the buttons. Save writes the file with no song and no pictures yet. Picture and song paths are stored relative to the project file, so the folder can move with its media.
+
+**Add song** picks the soundtrack (`mp3`, `wav`, `m4a`, `flac`, or `aac`). The file name and its length appear beside the button. **Change song** replaces it.
+
+A **look** sets the pacing, the dissolve, and a move on every picture. Classic is selected for a new project. The project file keeps its name. The video is 1920×1080.
+
+| Look | How time is shared | Between pictures | Behind the photo | Moves |
+| --- | --- | --- | --- | --- |
+| Classic | Pictures share the song | 1s dissolve | Black | Alternates slow zoom in and slow zoom out |
+| Photo film | Pictures share the song | 1.5s dissolve | A blurred copy of the photo | Cycles slow zoom in, pan across, drift down, and slow zoom out |
+| Quick slides | Each picture is 5 seconds | 0.5s dissolve | Black | Slow zoom in on every picture |
+
+Quick slides gives every picture the same five seconds, so a length pinned on one picture is cleared.
+
+**Add pictures** appends them in the order you picked (`jpg`, `jpeg`, `png`, or `webp`). That order is the film. **Sort by name**, **Move up**, and **Move down** rewrite it. A file that shows up later in a folder stays out of the film until you add it.
+
+The score shows each picture as soon as you add it. Before the song is known, the blocks are equal. After that, they take their clip lengths and the dissolves overlap. Click a block or a row to select that picture. The line under the score says how it will come out: how many pictures, about how long each one stays, and the dissolve between them.
+
+The selected picture sets its own move: Slow zoom in, Pan across, Drift down, Slow zoom out, or Hold still. When the pictures share the song and there are two or more, **Length in seconds** pins that picture and the others share what remains. **Share the rest** hands that time back. One picture runs for the whole song. Quick slides keeps one length for every picture, so the length box stays closed. **Replace** and **Remove** change that picture. **Shuffle pictures** reorders the list once. **Shuffle moves** assigns each picture one of the moves once. The next time the file opens, that order and those moves are what was saved.
+
+**Export shell script** and **Render video** both need a song and at least one picture. Each saves the Montage first, then asks where the file should go (`render.sh` or `out.mp4`). While a render runs, the controls lock and a timer counts beside the button. When it finishes, the line names the video and how long the render took. A failed ffmpeg step shows its error. An engine error is shown on the picture it belongs to.
+
+Each dialog remembers its own folder: the project, the pictures, the song, the script, and the video.
 
 ## Command line
 
@@ -102,19 +150,6 @@ generate-montage | kbvmaker render --dir /media/greenhouse -o /out/greenhouse.mp
 
 `serve` exposes the same engine over HTTP for programs that prefer it. `-addr` changes the address, and `-static frontend/build` also serves the client. It stops cleanly on SIGINT or SIGTERM.
 
-## Window and browser
-
-```
-pnpm --dir frontend build
-go build -tags production,webkit2_41 -o kbvmaker-window ./cmd/desktop   # WebKitGTK 4.1
-go build -tags production -o kbvmaker-window ./cmd/desktop              # WebKitGTK 4.0
-./kbvmaker-window
-
-kbvmaker serve -static frontend/build                                   # the same client in a browser
-```
-
-The window opens the client with native file dialogs that reopen in the last folder used. The browser host types paths instead. Both reach the engine through `/v1`. Build the client before the window, and restart the window after rebuilding the client.
-
 ## Layout
 
 The module path is `neal/kbvmaker`. Montage 1 is the package tree `v1`.
@@ -128,8 +163,8 @@ Document → Plan → []Command → bash | renderPlan JSON | exec
 | `v1` | Facade: load, resolve, compile, export, run. |
 | `web/v1` | HTTP API for Montage 1. |
 | `cmd/kbvmaker` | Command line. Calls the `v1` facade only. |
-| `cmd/desktop` | Wails window: native dialogs and the `/v1` bridge. |
-| `frontend/` | Svelte client shared by the browser and the window. |
+| `cmd/desktop` | Wails GUI: native dialogs and the `/v1` bridge. |
+| `frontend/` | Svelte client shared by the browser and the GUI. |
 | `v1/version` | The integer shared by the API, `montage`, and `renderPlan`. |
 | `v1/doc` | JSON types, defaults, and structural checks. |
 | `v1/model` | The resolved plan. |
@@ -157,4 +192,4 @@ pnpm --dir frontend test
 
 Unit tests cover decode, clocks, fill zoom, scheduling, and the 20-second two-clip timing case. One test resolves a document through a fake probe and checks that both exports carry the compiler's argv. One test writes a PNG and a WAV, renders a short hold, and checks the output size and duration with ffprobe.
 
-The command-line tests run `cli` with a fake probe and a stand-in ffmpeg script. They cover help, every usage error, exit codes, JSON errors, stdin and `-dir`, overrides, `-o` files, progress, `-clean`, a failed step, an interrupt, `serve`, and a plan that matches `/v1`. One more test renders a real video when ffmpeg is installed. The desktop tests open the real GTK dialogs when a display is available, and send an editor save through the window's `/v1` bridge. The frontend tests (Vitest with happy-dom) cover the document operations, the editor screen, and the window host.
+The command-line tests run `cli` with a fake probe and a stand-in ffmpeg script. They cover help, every usage error, exit codes, JSON errors, stdin and `-dir`, overrides, `-o` files, progress, `-clean`, a failed step, an interrupt, `serve`, and a plan that matches `/v1`. One more test renders a real video when ffmpeg is installed. The desktop tests open the real GTK dialogs when a display is available, and send an editor save through the GUI's `/v1` bridge. The frontend tests (Vitest with happy-dom) cover the document operations, the editor screen, and the GUI host.
