@@ -53,7 +53,7 @@ ffmpeg runs on the machine that serves the page.
 
 ### Making a film
 
-**New** starts a Classic project in memory. **Save** asks where to write it, and the dialog suggests `piece.montage.json`. **Open** reads a Montage that already exists. The header shows "Unsaved changes" until Save, then "Saved", and the path sits under the buttons. Save writes the file with no song and no pictures yet. Picture and song paths are stored relative to the project file, so the folder can move with its media.
+**New** starts a Classic project in memory. **Save** asks where to write it, and the dialog suggests `piece.montage.json`. **Open** reads a Montage that already exists. The line beside the buttons shows "Unsaved changes" until Save, then "Saved". The path sits under the buttons. Save writes the file with no song and no pictures yet. Picture and song paths are stored relative to the project file, so the folder can move with its media.
 
 **Add song** picks the soundtrack (`mp3`, `wav`, `m4a`, `flac`, or `aac`). The file name and its length appear beside the button. **Change song** replaces it.
 
@@ -69,7 +69,9 @@ Quick slides gives every picture the same five seconds, so a length pinned on on
 
 **Add pictures** appends them in the order you picked (`jpg`, `jpeg`, `png`, or `webp`). That order is the film. **Sort by name**, **Move up**, and **Move down** rewrite it. A file that shows up later in a folder stays out of the film until you add it.
 
-The timeline shows each picture as soon as you add it, as a block on a track. The block carries the picture's number when there is room, and the file name is its tooltip. Before the song is known, the blocks are equal. After that, they take their clip lengths, a darker band marks each dissolve, and the axis runs from 0:00 to the end of the film. The selected picture is filled solid. Click a block or a row to select that picture. The line under the timeline says how it will come out: how many pictures, about how long each one stays, and the dissolve between them.
+The timeline shows each picture as soon as you add it, as a block on a track. The block shows a thumbnail of the picture, and its number when there is room. The file name is the tooltip. The same thumbnail sits beside each name in the list. Before the song is known, the blocks are equal. After that, they take their clip lengths, a darker band marks each dissolve, and the axis runs from 0:00 to the end of the film. The selected picture is outlined. Click a block or a row to select that picture. The line under the timeline says how it will come out: how many pictures, about how long each one stays, and the dissolve between them.
+
+Thumbnails come from `POST /v1/thumbnail` with `{path, width, height}`. Each edge is from 1 to 512 pixels. The picture is scaled to cover that box and center-cropped, and the reply is JSON: `{type, width, height, data}` where `data` is a base64 JPEG. The window and the browser both use that JSON.
 
 The selected picture sets its own move: Slow zoom in, Pan across, Drift down, Slow zoom out, or Hold still. When the pictures share the song and there are two or more, **Length in seconds** pins that picture and the others share what remains. **Share the rest** hands that time back. One picture runs for the whole song. Quick slides keeps one length for every picture, so the length box stays closed. **Replace** and **Remove** change that picture. **Shuffle pictures** reorders the list once. **Shuffle moves** assigns each picture one of the moves once. The next time the file opens, that order and those moves are what was saved.
 

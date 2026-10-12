@@ -1022,12 +1022,15 @@ rebuild uses. Sort by name, move up, and move down each write that list
 once. A new file appearing in a folder does not reorder anything.
 
 The timeline is read-only and labeled Timeline. Each picture appears on it
-as soon as it is added, at an equal width, as a solid block with its number
-when the block is wide enough. The file name is the block's tooltip. When
-the song is known, the blocks take their clip lengths, a darker band marks
-each dissolve, and the axis runs from 0:00 to the film's length. Selecting
-a row paints that block in the primary color. Clicking a block only selects
-the same row. The song's length, in
+as soon as it is added, at an equal width. The block shows a thumbnail, and
+its number when the block is wide enough. The same thumbnail sits beside the
+name in the list. The file name is the block's tooltip. Thumbnails are
+`POST /v1/thumbnail`: the client names a path and a pixel size, and the
+reply is a base64 JPEG of exactly that size, cover-cropped. When the song
+is known, the blocks take their clip lengths, a darker band marks each
+dissolve, and the axis runs from 0:00 to the film's length. Selecting a
+row outlines that block. Clicking a block only selects the same row. The
+song's length, in
 minutes:seconds and in seconds, sits beside its name. A file dialog opens
 again in the folder it used last.
 

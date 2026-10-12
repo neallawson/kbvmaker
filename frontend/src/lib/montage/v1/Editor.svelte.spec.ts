@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/svelte';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Client, MontageFile } from './client';
@@ -53,7 +53,10 @@ function client(read?: MontageFile): { client: Client; plans: MontageFile[] } {
 			},
 			async save() {},
 			async exportScript() {},
-			async render() {}
+			async render() {},
+			async thumb() {
+				return 'data:image/jpeg;base64,thumb';
+			}
 		}
 	};
 }
@@ -67,7 +70,10 @@ describe('Editor', () => {
 		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
 		await user.click(screen.getByRole('button', { name: 'New' }));
 
-		expect(screen.getByText('Unsaved changes')).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 1, name: 'kbvmaker - Montage (v1) editor, renderer' })).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 1 }).parentElement?.textContent).not.toContain('Unsaved changes');
+		const buttons = screen.getByRole('button', { name: 'New' }).parentElement?.parentElement;
+		expect(buttons?.textContent).toContain('Unsaved changes');
 		expect(screen.getByRole('button', { name: 'Classic' }).getAttribute('aria-pressed')).toBe('true');
 		expect(screen.getByText('Each picture shows up here as you add it.')).toBeTruthy();
 	});
@@ -84,6 +90,13 @@ describe('Editor', () => {
 		});
 		expect(mark.getAttribute('title')).toBe('a.jpg');
 		expect(mark.textContent?.trim()).toBe('1');
+		await waitFor(() => {
+			expect(mark.querySelector('img')?.getAttribute('src')).toBe('data:image/jpeg;base64,thumb');
+		});
+		const row = screen.getByRole('listitem');
+		expect(within(row).getByRole('button', { name: '1. a.jpg' }).querySelector('img')?.getAttribute('src')).toBe(
+			'data:image/jpeg;base64,thumb'
+		);
 	});
 
 	it('shows the song length beside its name', async () => {

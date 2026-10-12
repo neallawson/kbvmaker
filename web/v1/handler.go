@@ -4,6 +4,8 @@ package v1
 
 import (
 	"bytes"
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -20,12 +22,15 @@ import (
 // There is no session and no global project.
 type Handler struct {
 	Probe media.Probe
+	// Thumb builds a JPEG of exactly width by height. Nil uses ffmpeg.
+	Thumb func(ctx context.Context, path string, width, height int) ([]byte, error)
 }
 
 // Register mounts the Montage 1 routes on mux.
 func (h Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/version", h.version)
 	mux.HandleFunc("POST /v1/audio", h.audio)
+	mux.HandleFunc("POST /v1/thumbnail", h.thumbnail)
 	mux.HandleFunc("POST /v1/plan", h.plan)
 	mux.HandleFunc("POST /v1/document", h.document)
 	mux.HandleFunc("POST /v1/export-script", h.exportScript)
@@ -59,6 +64,42 @@ func (h Handler) audio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]float64{"seconds": seconds})
+}
+
+type thumbRequest struct {
+	Path   string `json:"path"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+}
+
+func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
+	var req thumbRequest
+	if !decodeRequest(w, r, &req) {
+		return
+	}
+	if req.Path == "" {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "path"))
+		return
+	}
+	if req.Width < 1 || req.Height < 1 || req.Width > media.ThumbMax || req.Height > media.ThumbMax {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "thumbnail size %dx%d", req.Width, req.Height))
+		return
+	}
+	makeThumb := h.Thumb
+	if makeThumb == nil {
+		makeThumb = media.Thumbnail
+	}
+	jpeg, err := makeThumb(r.Context(), req.Path, req.Width, req.Height)
+	if err != nil {
+		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "image %s", req.Path))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"type":   "image/jpeg",
+		"width":  req.Width,
+		"height": req.Height,
+		"data":   base64.StdEncoding.EncodeToString(jpeg),
+	})
 }
 
 type planRequest struct {

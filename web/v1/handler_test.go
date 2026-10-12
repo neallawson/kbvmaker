@@ -1,6 +1,10 @@
 package v1_test
 
 import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -114,6 +118,75 @@ func TestDocumentRoundTripAndPlanBody(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"clipDur":8`) {
 		t.Fatalf("plan %d %s", rec.Code, rec.Body.String())
 	}
+}
+
+func TestThumbnailReturnsTheRequestedJPEG(t *testing.T) {
+	mux := http.NewServeMux()
+	webv1.Handler{
+		Probe: &media.Fake{},
+		Thumb: func(_ context.Context, path string, w, h int) ([]byte, error) {
+			if path != "/pics/a.jpg" || w != 32 || h != 18 {
+				t.Fatalf("thumb %s %dx%d", path, w, h)
+			}
+			return []byte("jpeg-bytes"), nil
+		},
+	}.Register(mux)
+	rec := post(mux, "/v1/thumbnail", `{"path":"/pics/a.jpg","width":32,"height":18}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	var got struct {
+		Type   string `json:"type"`
+		Width  int    `json:"width"`
+		Height int    `json:"height"`
+		Data   string `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := base64.StdEncoding.DecodeString(got.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Type != "image/jpeg" || got.Width != 32 || got.Height != 18 || string(raw) != "jpeg-bytes" {
+		t.Fatalf("reply %+v decoded %q", got, raw)
+	}
+}
+
+func TestThumbnailRejectsABadSize(t *testing.T) {
+	mux := http.NewServeMux()
+	webv1.Handler{Probe: &media.Fake{}, Thumb: func(context.Context, string, int, int) ([]byte, error) {
+		t.Fatal("thumbnailer should not run")
+		return nil, nil
+	}}.Register(mux)
+	for _, body := range []string{
+		`{"path":"/pics/a.jpg","width":0,"height":18}`,
+		`{"path":"/pics/a.jpg","width":8000,"height":18}`,
+		`{"width":32,"height":18}`,
+	} {
+		rec := post(mux, "/v1/thumbnail", body)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("body %s status %d %s", body, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestThumbnailReportsAMissingPicture(t *testing.T) {
+	mux := http.NewServeMux()
+	webv1.Handler{Probe: &media.Fake{}, Thumb: func(context.Context, string, int, int) ([]byte, error) {
+		return nil, errors.New("open a.jpg: no such file")
+	}}.Register(mux)
+	rec := post(mux, "/v1/thumbnail", `{"path":"/pics/a.jpg","width":32,"height":18}`)
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"code":"missing-media"`) {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+}
+
+func post(mux *http.ServeMux, path, body string) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	mux.ServeHTTP(rec, req)
+	return rec
 }
 
 func TestPlanRejectsAMissingDocument(t *testing.T) {

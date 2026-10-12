@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { Button } from '#lib/components/ui/button';
 	import type { Host } from '#lib/platform/host';
 	import { RuleError, type Client, type MontageFile, type Plan } from './client';
@@ -45,6 +46,11 @@
 	let songSeconds = $state<number | null>(null);
 	let pictureDraft = $state('');
 	let lengthDraft = $state<string | null>(null);
+	let thumbs = $state<Record<string, string>>({});
+
+	const title = 'kbvmaker - Montage (v1) editor, renderer';
+	const thumbWidth = 320;
+	const thumbHeight = 180;
 
 	const looks: { id: LookId; label: string }[] = [
 		{ id: 'classic', label: 'Classic' },
@@ -88,6 +94,39 @@
 			live = false;
 		};
 	});
+
+	const thumbInflight = new Set<string>();
+
+	$effect(() => {
+		const dir = projectDir(filePath);
+		const paths = (doc?.slots ?? []).map((slot) => mediaPath(dir, slot.src));
+		const pending = untrack(() => {
+			const next: string[] = [];
+			for (const path of paths) {
+				if (!path || thumbs[path] || thumbInflight.has(path) || next.includes(path)) {
+					continue;
+				}
+				next.push(path);
+			}
+			return next;
+		});
+		for (const path of pending) {
+			thumbInflight.add(path);
+			void client
+				.thumb(path, thumbWidth, thumbHeight)
+				.then((url) => {
+					thumbs[path] = url;
+				})
+				.catch(() => {})
+				.finally(() => {
+					thumbInflight.delete(path);
+				});
+		}
+	});
+
+	function thumbFor(src: string): string {
+		return thumbs[mediaPath(projectDir(filePath), src)] ?? '';
+	}
 
 	function edit(next: MontageFile) {
 		doc = next;
@@ -333,14 +372,17 @@
 	}
 </script>
 
+<svelte:head>
+	<title>{title}</title>
+</svelte:head>
+
 <main class="mx-auto flex max-w-3xl flex-col gap-4 p-6">
-	<header class="flex flex-wrap items-baseline justify-between gap-2">
-		<h1 class="text-2xl font-semibold">kbvmaker</h1>
-		<p class="text-muted-foreground text-sm">{dirty ? 'Unsaved changes' : filePath ? 'Saved' : ''}</p>
+	<header>
+		<h1 class="text-2xl font-semibold">{title}</h1>
 	</header>
 
 	<fieldset class="flex min-w-0 flex-col gap-4" disabled={working} aria-busy={working}>
-	<div class="flex flex-wrap gap-2">
+	<div class="flex flex-wrap items-center gap-2">
 		{#if !host.pickSaveMontage}
 			<input
 				class="border-input bg-background h-9 min-w-64 rounded-md border px-3"
@@ -348,9 +390,12 @@
 				bind:value={pathDraft}
 			/>
 		{/if}
-		<Button onclick={newProjectFile} disabled={working}>New</Button>
-		<Button variant="outline" onclick={() => openProject()} disabled={working}>Open</Button>
-		<Button variant="outline" onclick={save} disabled={working || !doc}>Save</Button>
+		<div class="flex flex-wrap gap-2">
+			<Button onclick={newProjectFile} disabled={working}>New</Button>
+			<Button variant="outline" onclick={() => openProject()} disabled={working}>Open</Button>
+			<Button variant="outline" onclick={save} disabled={working || !doc}>Save</Button>
+		</div>
+		<p class="text-muted-foreground ml-auto text-sm">{dirty ? 'Unsaved changes' : filePath ? 'Saved' : ''}</p>
 	</div>
 	{#if filePath}
 		<p class="text-sm">{filePath}</p>
@@ -422,15 +467,18 @@
 						<button
 							type="button"
 							class="mark absolute top-1 flex h-14 items-center justify-center overflow-hidden text-xs {selected === index
-								? 'bg-primary text-primary-foreground z-10'
-								: 'bg-[oklch(0.78_0_0)] text-foreground z-0'}"
+								? 'ring-primary z-10 ring-2 ring-inset'
+								: 'z-0'} bg-[oklch(0.78_0_0)]"
 							style="left: {block.left}%; width: {block.width}%"
 							title={baseName(block.src)}
 							aria-label="{index + 1}. {baseName(block.src)}"
 							aria-pressed={selected === index}
 							onclick={() => choose(index)}
 						>
-							<span class="mark-n">{index + 1}</span>
+							{#if thumbFor(block.src)}
+								<img alt="" src={thumbFor(block.src)} class="absolute inset-0 h-full w-full object-cover" />
+							{/if}
+							<span class="mark-n relative z-10 rounded bg-black/60 px-1 text-white">{index + 1}</span>
 						</button>
 					{:else}
 						<p class="text-muted-foreground p-2 text-sm">Each picture shows up here as you add it.</p>
@@ -457,11 +505,16 @@
 			<ul class="flex flex-col gap-2">
 				{#each doc.slots ?? [] as slot, index (slot.src + index)}
 					<li class="rounded-md border p-3 {selected === index ? 'border-primary' : ''}">
-						<button type="button" class="w-full text-left" onclick={() => choose(index)}>
-							{index + 1}. {baseName(slot.src)}
-							{#if plan?.slots[index]}
-								<span class="text-muted-foreground"> · {secondsLabel(plan.slots[index].clipDur)}s</span>
+						<button type="button" class="flex w-full items-center gap-2 text-left" onclick={() => choose(index)}>
+							{#if thumbFor(slot.src)}
+								<img alt="" src={thumbFor(slot.src)} class="h-10 w-16 shrink-0 rounded object-cover" />
 							{/if}
+							<span>
+								{index + 1}. {baseName(slot.src)}
+								{#if plan?.slots[index]}
+									<span class="text-muted-foreground"> · {secondsLabel(plan.slots[index].clipDur)}s</span>
+								{/if}
+							</span>
 						</button>
 						{#if error && errorSlot === index + 1}
 							<p role="alert">{error}</p>

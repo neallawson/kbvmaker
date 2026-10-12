@@ -42,7 +42,7 @@ func run(args []string) error {
 	handler := web.Server{Probe: probe}.Handler()
 	dialogs := &Dialogs{}
 	return wails.Run(&options.App{
-		Title:  "kbvmaker",
+		Title:  "kbvmaker - Montage (v1) editor, renderer",
 		Width:  1100,
 		Height: 760,
 		AssetServer: &assetserver.Options{

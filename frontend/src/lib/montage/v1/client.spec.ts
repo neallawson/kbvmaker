@@ -31,4 +31,14 @@ describe('Montage 1 client', () => {
 		});
 		await expect(client.plan('/gone.montage.json')).rejects.toBeInstanceOf(RuleError);
 	});
+
+	it('asks for a thumbnail of the requested size and returns a data URL', async () => {
+		let sent = '';
+		const client = createClient(async (_url, init) => {
+			sent = String(init?.body);
+			return json({ type: 'image/jpeg', width: 32, height: 18, data: 'abc' });
+		});
+		await expect(client.thumb('/pics/a.jpg', 32, 18)).resolves.toBe('data:image/jpeg;base64,abc');
+		expect(JSON.parse(sent)).toEqual({ path: '/pics/a.jpg', width: 32, height: 18 });
+	});
 });

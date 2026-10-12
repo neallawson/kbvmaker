@@ -28,7 +28,10 @@ function client(): Client {
 		},
 		async save() {},
 		async exportScript() {},
-		async render() {}
+		async render() {},
+		async thumb() {
+			return '';
+		}
 	};
 }
 

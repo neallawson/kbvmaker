@@ -61,6 +61,8 @@ export interface Client {
 	save(path: string, body: MontageFile): Promise<void>;
 	exportScript(path: string, file: string): Promise<void>;
 	render(path: string): Promise<void>;
+	/** thumb is a data URL for a JPEG of exactly width by height. */
+	thumb(path: string, width: number, height: number): Promise<string>;
 }
 
 export function createClient(fetchImpl: typeof fetch = fetch, base = ''): Client {
@@ -88,6 +90,14 @@ export function createClient(fetchImpl: typeof fetch = fetch, base = ''): Client
 		},
 		async render(path) {
 			await readJSON(fetchImpl, `${base}/v1/render`, jsonBody({ document: path }));
+		},
+		async thumb(path, width, height) {
+			const body = await readJSON<{ type: string; data: string }>(
+				fetchImpl,
+				`${base}/v1/thumbnail`,
+				jsonBody({ path, width, height })
+			);
+			return `data:${body.type};base64,${body.data}`;
 		}
 	};
 }
