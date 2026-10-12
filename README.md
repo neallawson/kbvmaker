@@ -1,4 +1,4 @@
-# kbvmaker - Ken Burns Video Maker
+# kbvmaker - Video Maker for Still Images.
 
 kbvmaker composes a video from still images and a soundtrack. Motion, cuts, and dissolves are described in a Montage document. The engine resolves that document into a timeline and drives ffmpeg.
 
@@ -154,7 +154,7 @@ generate-montage | kbvmaker render --dir /media/greenhouse -o /out/greenhouse.mp
 
 ## Layout
 
-The module path is `neal/kbvmaker`. Montage 1 is the package tree `v1`.
+The module path is `neal/kbvmaker`. [Montage 1](montage-v1.md) is the package tree `v1`.
 
 ```
 Document → Plan → []Command → bash | renderPlan JSON | exec
