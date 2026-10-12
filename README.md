@@ -55,7 +55,7 @@ ffmpeg runs on the machine that serves the page.
 
 **New** starts a Classic project in memory. **Save** asks where to write it, and the dialog suggests `piece.montage.json`. **Open** reads a Montage that already exists. The line beside the buttons shows "Unsaved changes" until Save, then "Saved". The path sits under the buttons. Save writes the file with no song and no pictures yet. Picture and song paths are stored relative to the project file, so the folder can move with its media.
 
-**Add song** picks the soundtrack (`mp3`, `wav`, `m4a`, `flac`, or `aac`). The file name and its length appear beside the button. **Change song** replaces it.
+**Add soundtrack** picks the audio (`mp3`, `wav`, `m4a`, `flac`, or `aac`). The file name and its length appear beside the button. **Change soundtrack** replaces it.
 
 A **look** sets the pacing, the dissolve, and a move on every picture. Classic is selected for a new project. The project file keeps its name. The video is 1920×1080.
 

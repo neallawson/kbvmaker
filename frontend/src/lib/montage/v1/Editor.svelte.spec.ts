@@ -106,7 +106,7 @@ describe('Editor', () => {
 		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
 		await user.click(screen.getByRole('button', { name: 'New' }));
 		await user.type(screen.getByRole('textbox', { name: 'Song file' }), '/films/song.mp3');
-		await user.click(screen.getByRole('button', { name: 'Add song' }));
+		await user.click(screen.getByRole('button', { name: 'Add soundtrack' }));
 		expect(await screen.findByText('3:42 · 222s')).toBeTruthy();
 	});
 

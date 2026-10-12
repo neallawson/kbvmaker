@@ -403,7 +403,7 @@
 
 	{#if doc}
 		<section class="flex flex-col gap-2">
-			<h2 class="font-medium">Song</h2>
+			<h2 class="font-medium">Soundtrack</h2>
 			<div class="flex flex-wrap gap-2">
 				{#if !host.pickAudio}
 					<input
@@ -413,7 +413,7 @@
 					/>
 				{/if}
 				<Button variant="outline" onclick={() => addSong()}>
-					{doc.audio ? 'Change song' : 'Add song'}
+					{doc.audio ? 'Change soundtrack' : 'Add soundtrack'}
 				</Button>
 			</div>
 			{#if doc.audio}
