@@ -1,4 +1,4 @@
-# kbvmaker - Video Maker for Still Images.
+# kbvmaker - Video Maker for Still Images and a Soundtrack
 
 kbvmaker composes a video from still images and a soundtrack. Motion, cuts, and dissolves are described in a Montage document. The engine resolves that document into a timeline and drives ffmpeg.
 
