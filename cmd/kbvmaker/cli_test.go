@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"neal/kbvmaker/v1/media"
-	"neal/kbvmaker/web"
+	"kbvmaker/v1/media"
+	"kbvmaker/web"
 )
 
 const pieceJSON = `{

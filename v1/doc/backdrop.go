@@ -2,7 +2,7 @@ package doc
 
 import "regexp"
 
-import "neal/kbvmaker/v1/rule"
+import "kbvmaker/v1/rule"
 
 var colorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 

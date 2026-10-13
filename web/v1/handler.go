@@ -1,5 +1,5 @@
 // Package v1 is the HTTP API for Montage 1.
-// A later Montage is a sibling package. This one imports only neal/kbvmaker/v1.
+// A later Montage is a sibling package. This one imports only kbvmaker/v1.
 package v1
 
 import (
@@ -11,11 +11,11 @@ import (
 	"net/http"
 	"os"
 
-	engine "neal/kbvmaker/v1"
-	"neal/kbvmaker/v1/compile"
-	"neal/kbvmaker/v1/doc"
-	"neal/kbvmaker/v1/media"
-	"neal/kbvmaker/v1/rule"
+	engine "kbvmaker/v1"
+	"kbvmaker/v1/compile"
+	"kbvmaker/v1/doc"
+	"kbvmaker/v1/media"
+	"kbvmaker/v1/rule"
 )
 
 // Handler serves /v1 for one probe. The request names the document.

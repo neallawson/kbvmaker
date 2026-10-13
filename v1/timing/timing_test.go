@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"neal/kbvmaker/v1/doc"
+	"kbvmaker/v1/doc"
 )
 
 func defaults() doc.Defaults {

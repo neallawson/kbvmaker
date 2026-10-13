@@ -9,7 +9,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"neal/kbvmaker/v1/version"
+	"kbvmaker/v1/version"
 )
 
 func topHelp() string {

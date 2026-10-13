@@ -4,8 +4,8 @@ package check
 import (
 	"math"
 
-	"neal/kbvmaker/v1/model"
-	"neal/kbvmaker/v1/rule"
+	"kbvmaker/v1/model"
+	"kbvmaker/v1/rule"
 )
 
 // All rejects a plan that breaks a render rule.

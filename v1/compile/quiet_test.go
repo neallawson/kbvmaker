@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"neal/kbvmaker/v1/model"
+	"kbvmaker/v1/model"
 )
 
 func quietPlan() *model.Plan {

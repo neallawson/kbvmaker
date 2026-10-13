@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"neal/kbvmaker/v1"
-	"neal/kbvmaker/v1/frame"
-	"neal/kbvmaker/v1/media"
+	"kbvmaker/v1"
+	"kbvmaker/v1/frame"
+	"kbvmaker/v1/media"
 )
 
 func TestGeneratedImageAndShortRender(t *testing.T) {

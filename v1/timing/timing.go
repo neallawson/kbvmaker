@@ -4,10 +4,10 @@ package timing
 import (
 	"math"
 
-	"neal/kbvmaker/v1/clock"
-	"neal/kbvmaker/v1/doc"
-	"neal/kbvmaker/v1/model"
-	"neal/kbvmaker/v1/rule"
+	"kbvmaker/v1/clock"
+	"kbvmaker/v1/doc"
+	"kbvmaker/v1/model"
+	"kbvmaker/v1/rule"
 )
 
 // Resolve returns one window per slot and the output video duration.

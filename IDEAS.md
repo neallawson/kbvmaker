@@ -689,7 +689,7 @@ Change the song or a marker, and export again.
 
 ## Engine
 
-The Go module is `neal/kbvmaker`. The Montage 1 API is the package tree
+The Go module is `kbvmaker`. The Montage 1 API is the package tree
 `v1`. `v1.Version`, the document field `montage`, and the export field
 `renderPlan` are the same number. Montage 2 will be a new tree, `v2`, and
 `v1` keeps loading version-1 documents. The CLI and, later, the Wails window
@@ -1099,7 +1099,7 @@ named preset if they are added at all.
 
 The window and the local browser are two hosts of one Svelte client. Both
 talk to the Go engine over HTTP at `/v1`. The engine packages stay free of
-HTTP and of Wails. Handlers in `web/v1` call `neal/kbvmaker/v1` the way the
+HTTP and of Wails. Handlers in `web/v1` call `kbvmaker/v1` the way the
 CLI does.
 
 Wails is a window onto that server, plus the native open and save dialogs a

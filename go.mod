@@ -1,4 +1,4 @@
-module neal/kbvmaker
+module kbvmaker
 
 go 1.23
 

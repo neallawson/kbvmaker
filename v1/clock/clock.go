@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strconv"
 
-	"neal/kbvmaker/v1/doc"
-	"neal/kbvmaker/v1/rule"
+	"kbvmaker/v1/doc"
+	"kbvmaker/v1/rule"
 )
 
 // Place is the resolved clip a segment is measured against.

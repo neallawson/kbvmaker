@@ -14,8 +14,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
-	"neal/kbvmaker/v1/media"
-	"neal/kbvmaker/web"
+	"kbvmaker/v1/media"
+	"kbvmaker/web"
 )
 
 func main() {

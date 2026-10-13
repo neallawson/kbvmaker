@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"neal/kbvmaker/v1/media"
-	apiv1 "neal/kbvmaker/web/v1"
+	"kbvmaker/v1/media"
+	apiv1 "kbvmaker/web/v1"
 )
 
 // Server is the local browser host. Static may be nil when only the API is mounted.

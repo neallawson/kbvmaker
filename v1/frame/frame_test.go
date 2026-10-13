@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"neal/kbvmaker/v1/model"
+	"kbvmaker/v1/model"
 )
 
 func TestFillPortraitAndLandscape(t *testing.T) {

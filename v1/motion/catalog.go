@@ -1,6 +1,6 @@
 package motion
 
-import "neal/kbvmaker/v1/doc"
+import "kbvmaker/v1/doc"
 
 func builtin(name string, hold float64) ([]doc.Segment, string, bool) {
 	switch name {

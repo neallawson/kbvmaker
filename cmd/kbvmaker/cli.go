@@ -15,11 +15,11 @@ import (
 	"strconv"
 	"time"
 
-	"neal/kbvmaker/v1"
-	"neal/kbvmaker/v1/doc"
-	"neal/kbvmaker/v1/media"
-	"neal/kbvmaker/v1/model"
-	"neal/kbvmaker/web"
+	"kbvmaker/v1"
+	"kbvmaker/v1/doc"
+	"kbvmaker/v1/media"
+	"kbvmaker/v1/model"
+	"kbvmaker/web"
 )
 
 // env is everything the CLI touches outside its arguments, so tests can replace it.

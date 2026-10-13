@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"neal/kbvmaker/v1/media"
-	webv1 "neal/kbvmaker/web/v1"
+	"kbvmaker/v1/media"
+	webv1 "kbvmaker/web/v1"
 )
 
 func TestVersion(t *testing.T) {

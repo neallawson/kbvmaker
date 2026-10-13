@@ -787,10 +787,10 @@ A future version adds keys or enum values; it does not reuse a version-1
 key for a new meaning. Version 1 has no expression language and no musical
 clock.
 
-The Go API for this document is the package tree `neal/kbvmaker/v1`. Its
+The Go API for this document is the package tree `kbvmaker/v1`. Its
 `Version` constant is 1, the same number as the `montage` field, and the
 same number as `renderPlan` in an exported command list. A later Montage
-is a new package, `neal/kbvmaker/v2`, which accepts `montage: 2`. Version 1
+is a new package, `kbvmaker/v2`, which accepts `montage: 2`. Version 1
 stays able to load a version-1 document. The engine does not accept two
 document versions through one package.
 

@@ -3,13 +3,13 @@ package v1
 import (
 	"context"
 
-	"neal/kbvmaker/v1/compile"
-	"neal/kbvmaker/v1/doc"
-	"neal/kbvmaker/v1/export"
-	"neal/kbvmaker/v1/media"
-	"neal/kbvmaker/v1/model"
-	"neal/kbvmaker/v1/plan"
-	"neal/kbvmaker/v1/run"
+	"kbvmaker/v1/compile"
+	"kbvmaker/v1/doc"
+	"kbvmaker/v1/export"
+	"kbvmaker/v1/media"
+	"kbvmaker/v1/model"
+	"kbvmaker/v1/plan"
+	"kbvmaker/v1/run"
 )
 
 // Engine resolves Montage 1 documents and compiles render commands.

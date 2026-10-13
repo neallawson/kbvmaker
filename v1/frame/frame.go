@@ -1,7 +1,7 @@
 // Package frame is the geometry of one photograph on the working canvas.
 package frame
 
-import "neal/kbvmaker/v1/model"
+import "kbvmaker/v1/model"
 
 // Fill is the zoom that just covers the canvas aspect.
 // w and h are the photograph's displayed size. W and H are the canvas.

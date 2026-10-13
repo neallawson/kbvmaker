@@ -5,17 +5,17 @@ import (
 	"context"
 	"os"
 
-	"neal/kbvmaker/v1/check"
-	"neal/kbvmaker/v1/clock"
-	"neal/kbvmaker/v1/doc"
-	"neal/kbvmaker/v1/frame"
-	"neal/kbvmaker/v1/media"
-	"neal/kbvmaker/v1/model"
-	"neal/kbvmaker/v1/motion"
-	"neal/kbvmaker/v1/rule"
-	"neal/kbvmaker/v1/schedule"
-	"neal/kbvmaker/v1/timing"
-	"neal/kbvmaker/v1/version"
+	"kbvmaker/v1/check"
+	"kbvmaker/v1/clock"
+	"kbvmaker/v1/doc"
+	"kbvmaker/v1/frame"
+	"kbvmaker/v1/media"
+	"kbvmaker/v1/model"
+	"kbvmaker/v1/motion"
+	"kbvmaker/v1/rule"
+	"kbvmaker/v1/schedule"
+	"kbvmaker/v1/timing"
+	"kbvmaker/v1/version"
 )
 
 // Resolve probes media, expands modes, and checks the timeline.

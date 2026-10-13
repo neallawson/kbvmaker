@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"neal/kbvmaker/v1/rule"
+	"kbvmaker/v1/rule"
 )
 
 const twoSlots = `{

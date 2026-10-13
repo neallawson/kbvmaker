@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"neal/kbvmaker/v1/compile"
+	"kbvmaker/v1/compile"
 )
 
 // Event reports one step starting or finishing.

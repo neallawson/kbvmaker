@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"neal/kbvmaker/v1/doc"
+	"kbvmaker/v1/doc"
 )
 
 func TestSplitMixVectors(t *testing.T) {

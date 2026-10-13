@@ -6,7 +6,7 @@ import (
 	"math"
 	"sort"
 
-	"neal/kbvmaker/v1/rule"
+	"kbvmaker/v1/rule"
 )
 
 func rejectDup(b []byte) error {

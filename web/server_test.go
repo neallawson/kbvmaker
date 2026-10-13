@@ -6,8 +6,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"neal/kbvmaker/v1/media"
-	"neal/kbvmaker/web"
+	"kbvmaker/v1/media"
+	"kbvmaker/web"
 )
 
 func TestStaticFallsBackToIndex(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"neal/kbvmaker/v1/compile"
+	"kbvmaker/v1/compile"
 )
 
 // tool writes a shell script that creates its last argument and runs body first.

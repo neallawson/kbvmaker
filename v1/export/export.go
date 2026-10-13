@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"neal/kbvmaker/v1/compile"
-	"neal/kbvmaker/v1/version"
+	"kbvmaker/v1/compile"
+	"kbvmaker/v1/version"
 )
 
 // Script is a bash program that runs the commands from the project directory.

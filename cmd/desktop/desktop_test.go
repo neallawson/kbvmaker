@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"neal/kbvmaker/v1/media"
-	"neal/kbvmaker/web"
+	"kbvmaker/v1/media"
+	"kbvmaker/web"
 )
 
 // The document the editor sends after New (Classic), a song, and two pictures.

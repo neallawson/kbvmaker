@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"neal/kbvmaker/v1/rule"
+	"kbvmaker/v1/rule"
 )
 
 var modeRe = regexp.MustCompile(modeName)

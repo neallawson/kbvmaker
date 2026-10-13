@@ -173,7 +173,7 @@ generate-montage | kbvmaker render --dir /media/greenhouse -o /out/greenhouse.mp
 
 ## Layout
 
-The module path is `neal/kbvmaker`. [Montage 1](montage-v1.md) is the package tree `v1`.
+The module path is `kbvmaker`. [Montage 1](montage-v1.md) is the package tree `v1`.
 
 ```
 Document → Plan → []Command → bash | renderPlan JSON | exec

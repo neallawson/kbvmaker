@@ -8,8 +8,8 @@ import (
 	"io"
 	"os"
 
-	"neal/kbvmaker/v1"
-	"neal/kbvmaker/v1/rule"
+	"kbvmaker/v1"
+	"kbvmaker/v1/rule"
 )
 
 // Exit codes. A script can tell a bad document from a missing photo from a

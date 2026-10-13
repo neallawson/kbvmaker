@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"neal/kbvmaker/v1"
-	"neal/kbvmaker/v1/media"
+	"kbvmaker/v1"
+	"kbvmaker/v1/media"
 )
 
 // These tests ask a real ffmpeg whether the graphs we compile are legal.

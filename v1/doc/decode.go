@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"neal/kbvmaker/v1/rule"
-	"neal/kbvmaker/v1/version"
+	"kbvmaker/v1/rule"
+	"kbvmaker/v1/version"
 )
 
 // Load reads a Montage document and applies defaults.

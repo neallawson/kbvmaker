@@ -6,7 +6,7 @@ The application is kbvmaker. The format is Montage.
 
 ## Version boundary
 
-The module is `neal/kbvmaker`. Montage 1 is `neal/kbvmaker/v1`.
+The module is `kbvmaker`. Montage 1 is `kbvmaker/v1`.
 
 `v1.Version`, the document field `montage`, and the export field `renderPlan` are `v1/version.Current`. Today that is 1. Reject any other `montage` value from this package.
 

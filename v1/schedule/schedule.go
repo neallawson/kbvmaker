@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"neal/kbvmaker/v1/doc"
-	"neal/kbvmaker/v1/rule"
+	"kbvmaker/v1/doc"
+	"kbvmaker/v1/rule"
 )
 
 // RNG is the splitmix64 generator from the Montage v1 specification.

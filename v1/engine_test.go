@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"neal/kbvmaker/v1"
-	"neal/kbvmaker/v1/compile"
-	"neal/kbvmaker/v1/media"
+	"kbvmaker/v1"
+	"kbvmaker/v1/compile"
+	"kbvmaker/v1/media"
 )
 
 func TestResolveCompileAndExports(t *testing.T) {
