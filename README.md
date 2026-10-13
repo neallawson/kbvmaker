@@ -211,6 +211,6 @@ go test ./...
 pnpm --dir frontend test
 ```
 
-Unit tests cover decode, clocks, fill zoom, scheduling, and the 20-second two-clip timing case. One test resolves a document through a fake probe and checks that both exports carry the compiler's argv. One test writes a PNG and a WAV, renders a short hold, and checks the output size and duration with ffprobe.
+Unit tests cover decode, clocks, fill zoom, scheduling, and the 20-second two-clip timing case. One test resolves a document through a fake probe and checks that both exports carry the compiler's argv. When ffmpeg is present, smoke tests render one frame of each backdrop, one short clip of each move, one dissolve, and one file whose pixel format and audio codec are checked with ffprobe. A separate test writes a PNG and a WAV, renders a short hold, and checks the output size and duration.
 
 The command-line tests run `cli` with a fake probe and a stand-in ffmpeg script. They cover help, every usage error, exit codes, JSON errors, stdin and `-dir`, overrides, `-o` files, progress, `-clean`, a failed step, an interrupt, `serve`, and a plan that matches `/v1`. One more test renders a real video when ffmpeg is installed. The desktop tests open the real GTK dialogs when a display is available, and send an editor save through the GUI's `/v1` bridge. The frontend tests (Vitest with happy-dom) cover the document operations, the editor screen, and the GUI host.
