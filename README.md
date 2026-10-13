@@ -24,24 +24,45 @@ The GUI and the local browser are two hosts of one Svelte client. Both call the 
 
 Where `IDEAS.md` and `montage-v1.md` disagree, the specification wins.
 
-## Requirements
+## Install
 
-Go 1.23. ffmpeg and ffprobe on `PATH` for probing media and for `render`. `go test ./...` skips the short render when ffmpeg is absent.
+Prebuilt downloads are not published yet. Build the command line or the GUI from source.
 
-The GUI on Linux needs WebKitGTK, which brings GTK 3. The file dialogs are native GTK, built with cgo against the same library, so nothing else is required. Windows and macOS use the Wails dialogs. Releases target Ubuntu 22.04 or newer with `libwebkit2gtk-4.1-dev`. Older systems with only `libwebkit2gtk-4.0-dev` can build the GUI for development.
+The command line needs [Go 1.23](https://go.dev/dl/) or newer, plus `ffmpeg` and `ffprobe` on `PATH`. `go test ./...` skips the short render when ffmpeg is absent. The GUI needs those and a few more tools. `./scripts/build` checks for them and, on Linux, uses the WebKitGTK library that is already installed.
+
+## Build from source
+
+### Command line
+
+```
+go build -o kbvmaker ./cmd/kbvmaker
+```
+
+### Desktop editor
+
+Linux and macOS:
+
+```
+./scripts/build
+./kbvmaker-gui
+```
+
+Windows, from PowerShell:
+
+```
+powershell -File scripts\build.ps1
+.\kbvmaker-gui.exe
+```
+
+Git Bash or WSL on Windows can run `./scripts/build` instead.
+
+The script installs frontend dependencies on a fresh checkout, builds the Svelte client, then builds the GUI. Restart the GUI after rebuilding the client. On Linux it uses WebKitGTK 4.1 when that library is installed, and WebKitGTK 4.0 otherwise. If neither is installed, it prints one package command for apt, dnf, pacman, or zypper and stops. Windows uses the WebView2 runtime that ships with current Windows 10 and Windows 11. macOS uses the system WebKit, and the script asks for the Xcode command line tools when `clang` is missing.
 
 ## GUI
 
 kbvmaker-gui is the editor. One screen holds the project, the song, a look, the pictures, and a read-only timeline of how the film will play. The same screens run in a browser. The GUI adds native file dialogs that reopen in the last folder used for that kind of file.
 
-```
-pnpm --dir frontend build
-go build -tags production,webkit2_41 -o kbvmaker-gui ./cmd/desktop   # WebKitGTK 4.1
-go build -tags production -o kbvmaker-gui ./cmd/desktop              # WebKitGTK 4.0
-./kbvmaker-gui
-```
-
-Build the client before the GUI, and restart the GUI after rebuilding the client. The browser host types a path into the box instead of opening a dialog:
+The browser host types a path into the box instead of opening a dialog:
 
 ```
 kbvmaker serve -static frontend/build

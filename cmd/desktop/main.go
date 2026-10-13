@@ -2,7 +2,7 @@
 
 // Command desktop opens the kbvmaker window on the shared HTTP API.
 //
-//	go build -tags production -o kbvmaker-gui ./cmd/desktop
+//	./scripts/build
 package main
 
 import (

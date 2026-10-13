@@ -6,6 +6,7 @@ import "fmt"
 import "os"
 
 func main() {
-	fmt.Fprintln(os.Stderr, "build with: go build -tags production -o kbvmaker-gui ./cmd/desktop")
+	fmt.Fprintln(os.Stderr, "build the GUI with ./scripts/build")
+	fmt.Fprintln(os.Stderr, "Windows PowerShell: powershell -File scripts\\build.ps1")
 	os.Exit(1)
 }

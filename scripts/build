@@ -1,0 +1,104 @@
+#!/bin/sh
+# Build kbvmaker-gui. Picks the Linux WebKitGTK library that is installed.
+# Windows and macOS build with -tags production and no WebKit tag.
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+cd "$root"
+
+die() {
+	printf '%s\n' "$@" >&2
+	exit 1
+}
+
+missing=""
+for cmd in go pnpm ffmpeg ffprobe; do
+	if ! command -v "$cmd" >/dev/null 2>&1; then
+		missing="$missing $cmd"
+	fi
+done
+if [ -n "$missing" ]; then
+	die "Missing programs:${missing}." "Install them and run this script again."
+fi
+
+linux_install_hint() {
+	if command -v apt-get >/dev/null 2>&1; then
+		webkit_pkg="libwebkit2gtk-4.0-dev"
+		if apt-cache show libwebkit2gtk-4.1-dev >/dev/null 2>&1; then
+			webkit_pkg="libwebkit2gtk-4.1-dev"
+		fi
+		printf '%s\n' "sudo apt-get install build-essential pkg-config libgtk-3-dev ${webkit_pkg}"
+		return
+	fi
+	if command -v dnf >/dev/null 2>&1; then
+		webkit_pkg="webkit2gtk3-devel"
+		if dnf -q repoquery webkit2gtk4.1-devel 2>/dev/null | grep -q .; then
+			webkit_pkg="webkit2gtk4.1-devel"
+		fi
+		printf '%s\n' "sudo dnf install gcc pkgconf-pkg-config gtk3-devel ${webkit_pkg}"
+		return
+	fi
+	if command -v pacman >/dev/null 2>&1; then
+		webkit_pkg="webkit2gtk"
+		if pacman -Si webkit2gtk-4.1 >/dev/null 2>&1; then
+			webkit_pkg="webkit2gtk-4.1"
+		fi
+		printf '%s\n' "sudo pacman -S --needed base-devel gtk3 ${webkit_pkg}"
+		return
+	fi
+	if command -v zypper >/dev/null 2>&1; then
+		webkit_pkg="webkit2gtk3-devel"
+		if zypper info webkit2gtk-4_1-devel >/dev/null 2>&1; then
+			webkit_pkg="webkit2gtk-4_1-devel"
+		fi
+		printf '%s\n' "sudo zypper install gcc pkg-config gtk3-devel ${webkit_pkg}"
+		return
+	fi
+	printf '%s\n' "Install a C compiler, pkg-config, GTK 3, and WebKitGTK 4.1 (or 4.0) development files."
+}
+
+os=$(uname -s)
+tags="production"
+out="kbvmaker-gui"
+
+case "$os" in
+Linux)
+	if ! command -v pkg-config >/dev/null 2>&1 || { ! command -v gcc >/dev/null 2>&1 && ! command -v cc >/dev/null 2>&1; }; then
+		die "A C compiler and pkg-config are required to build the GUI." "Install them, then run this script again:" "" "$(linux_install_hint)"
+	fi
+	if pkg-config --exists webkit2gtk-4.1 && pkg-config --exists 'gtk+-3.0'; then
+		tags="production,webkit2_41"
+		printf '%s\n' "Using WebKitGTK 4.1"
+	elif pkg-config --exists webkit2gtk-4.0 && pkg-config --exists 'gtk+-3.0'; then
+		tags="production"
+		printf '%s\n' "Using WebKitGTK 4.0"
+	else
+		die "WebKitGTK and GTK 3 development files are not installed." "Install them, then run this script again:" "" "$(linux_install_hint)"
+	fi
+	;;
+Darwin)
+	if ! command -v clang >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1; then
+		die "The Xcode command line tools are required." "Install them, then run this script again:" "" "xcode-select --install"
+	fi
+	printf '%s\n' "Using the system WebKit"
+	;;
+MINGW*|MSYS*|CYGWIN*)
+	out="kbvmaker-gui.exe"
+	printf '%s\n' "Using the Windows WebView2 runtime"
+	;;
+*)
+	die "This script does not know how to build on ${os}."
+	;;
+esac
+
+if [ ! -d frontend/node_modules ]; then
+	printf '%s\n' "Installing frontend dependencies"
+	pnpm --dir frontend install --frozen-lockfile
+fi
+
+printf '%s\n' "Building the client"
+pnpm --dir frontend build
+
+printf '%s\n' "Building ${out}"
+go build -tags "$tags" -o "$out" ./cmd/desktop
+printf '%s\n' "Built ./${out}"

@@ -41,6 +41,10 @@ Unknown JSON keys are errors. Duplicate keys are errors. `encoding/json` does no
 
 Zoom `1.0` means the whole photograph is in frame. Apply rotation metadata before fill zoom. Keep ffmpeg stderr. Paths are argv elements, not shell-parsed strings.
 
+## Building the GUI
+
+`./scripts/build` builds the client and the GUI. On Linux it selects WebKitGTK 4.1 or 4.0 with pkg-config. Windows PowerShell uses `scripts/build.ps1`. Leave those commands out of the README. The script prints the package to install when the library is missing.
+
 ## Tests
 
 `go test ./...` is the Go check. Add a test at the seam you changed: decode, clock, frame, schedule, timing, motion, check, golden argv, or an HTTP handler. `pnpm test` in `frontend/` is the client check. Add a test for a v1 client behavior or a screen you changed.
