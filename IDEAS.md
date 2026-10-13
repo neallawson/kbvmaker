@@ -1,13 +1,12 @@
 # Making the Ken Burns video tool generic
 
 Notes from the Greenhouse tape work, so the next session can start from the
-design instead of the chat. The engine today is `make_Greenhouse_video_v3.sh`.
-The album names, the fixed list of 13 photos, and `i % 4` pattern selection
-are the parts that are still specific to this one video.
+design instead of the chat. The album names, the fixed list of 13 photos, and
+`i % 4` pattern selection were specific to that one video.
 
 ## Invariants already settled
 
-These came out of a real failure. Keep them when the script becomes a tool.
+These came out of a real failure. Keep them.
 
 Zoom `1.0` means the entire photograph is in the frame. The old pipeline
 scaled with `force_original_aspect_ratio=increase` and cropped to 16:9

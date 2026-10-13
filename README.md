@@ -11,8 +11,6 @@ Montage 1 and the Go engine that loads it are in this tree. The command line che
 
 The GUI and the local browser are two hosts of one Svelte client. Both call the Go API at `/v1`. The editor creates and saves a Montage, lists the pictures in their saved order, pins picture lengths, applies looks, shows a read-only timeline of the plan, and exports a script or renders the video. The shape is in `IDEAS.md` under Editor and Hosts. A multi-session site is later. The resolution rules stay in the `v1` packages.
 
-`make_Greenhouse_video_v3.sh` is the first Greenhouse tape, kept as a reference. It is not the application.
-
 ## Documents
 
 | File | Role |

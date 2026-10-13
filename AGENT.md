@@ -2,7 +2,7 @@
 
 Read `montage-v1.md` before changing resolution, the document schema, or ffmpeg output. It is the normative spec. `IDEAS.md` is the design record. Where they disagree, the spec wins.
 
-The application is kbvmaker. The format is Montage. `make_Greenhouse_video_v3.sh` is a reference tape, not code to extend.
+The application is kbvmaker. The format is Montage.
 
 ## Version boundary
 
