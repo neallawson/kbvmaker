@@ -54,6 +54,10 @@ export function applyLook(file: MontageFile, id: LookId): MontageFile {
 		}
 		return next;
 	});
+	if (look.timing.policy === 'fit-audio' && slots.length > 1 && slots.every((slot) => slot.dur != null)) {
+		const last = slots.length - 1;
+		slots[last] = withoutDur(slots[last]);
+	}
 	return {
 		...file,
 		canvas: look.canvas,
@@ -88,14 +92,52 @@ export function setAudio(file: MontageFile, audio: string): MontageFile {
 }
 
 export function moveSlot(file: MontageFile, index: number, delta: -1 | 1): MontageFile {
+	return reorderSlot(file, index, index + delta);
+}
+
+/** reorderSlot moves one picture to a new index. The picture keeps its pin. */
+export function reorderSlot(file: MontageFile, from: number, to: number): MontageFile {
 	const slots = [...(file.slots ?? [])];
-	const next = index + delta;
-	if (next < 0 || next >= slots.length) {
+	if (from === to || from < 0 || to < 0 || from >= slots.length || to >= slots.length) {
 		return file;
 	}
-	const [row] = slots.splice(index, 1);
-	slots.splice(next, 0, row);
+	const [row] = slots.splice(from, 1);
+	slots.splice(to, 0, row);
 	return { ...file, slots };
+}
+
+/**
+ * dropIndex is the index the picture at `from` lands on when released at `at`.
+ * `centers` and `at` share one horizontal axis. A point on a center counts as
+ * the left side of that center. At or left of the first center lands first.
+ * Right of the last center lands last.
+ */
+export function dropIndex(centers: number[], from: number, at: number): number {
+	const n = centers.length;
+	if (n === 0 || from < 0 || from >= n) {
+		return from;
+	}
+	let before = n;
+	if (at <= centers[0]) {
+		before = 0;
+	} else if (at > centers[n - 1]) {
+		before = n;
+	} else {
+		for (let i = 0; i < n - 1; i++) {
+			if (at <= centers[i + 1]) {
+				before = i + 1;
+				break;
+			}
+		}
+	}
+	let to = before > from ? before - 1 : before;
+	if (to < 0) {
+		to = 0;
+	}
+	if (to > n - 1) {
+		to = n - 1;
+	}
+	return to;
 }
 
 export function removeSlot(file: MontageFile, index: number): MontageFile {
@@ -120,17 +162,130 @@ export function setMode(file: MontageFile, index: number, mode: string): Montage
 export function setDur(file: MontageFile, index: number, dur: number | null): MontageFile {
 	return {
 		...file,
-		slots: (file.slots ?? []).map((slot, i) => {
-			if (i !== index) {
-				return slot;
-			}
-			if (dur == null) {
-				const { dur: _ignored, ...rest } = slot;
-				return rest;
-			}
-			return { ...slot, dur };
-		})
+		slots: (file.slots ?? []).map((slot, i) => (i === index ? withDur(slot, dur) : slot))
 	};
+}
+
+function withDur(slot: Picture, dur: number | null): Picture {
+	if (dur == null) {
+		return withoutDur(slot);
+	}
+	return { ...slot, dur };
+}
+
+function withoutDur(slot: Picture): Picture {
+	const { dur: _ignored, ...rest } = slot;
+	return rest;
+}
+
+const minPastDissolve = 0.001;
+
+/** roundSeconds keeps a stored length to the millisecond. */
+export function roundSeconds(n: number): number {
+	return Math.round(n * 1000) / 1000;
+}
+
+/** resizedLengths is the clip lengths after a divider drag. Null means the drag did not move. */
+export function resizedLengths(lengths: number[], join: number, delta: number, dissolve: number): number[] | null {
+	if (join < 0 || join + 1 >= lengths.length) {
+		return null;
+	}
+	const applied = clampDelta(lengths[join], lengths[join + 1], delta, dissolve);
+	if (Math.abs(applied) < 1e-9) {
+		return null;
+	}
+	return lengths.map((length, i) =>
+		roundSeconds(i === join ? lengths[join] + applied : i === join + 1 ? lengths[join + 1] - applied : length)
+	);
+}
+
+/**
+ * resizePictures gives `delta` seconds to the picture left of `join` and takes
+ * them from the picture on the right. The film's length stays. The drag stops
+ * when either picture would become as short as the dissolve. fit-audio stores
+ * pins and keeps one picture unpinned. fixed-clip becomes explicit, with every
+ * current length written, then the same exchange.
+ */
+export function resizePictures(
+	file: MontageFile,
+	lengths: number[],
+	join: number,
+	delta: number,
+	dissolve: number
+): MontageFile {
+	const slots = file.slots ?? [];
+	const next = resizedLengths(lengths, join, delta, dissolve);
+	if (!next || next.length !== slots.length) {
+		return file;
+	}
+	const left = next[join];
+	const right = next[join + 1];
+	const policy = file.timing?.policy ?? 'fit-audio';
+	if (policy === 'fixed-clip' || policy === 'explicit') {
+		return {
+			...file,
+			timing: { policy: 'explicit' },
+			slots: slots.map((slot, i) => withDur(slot, next[i]))
+		};
+	}
+	if (policy !== 'fit-audio') {
+		return file;
+	}
+	return { ...file, slots: pinDivider(slots, join, left, right) };
+}
+
+function clampDelta(left: number, right: number, delta: number, dissolve: number): number {
+	const floor = dissolve + minPastDissolve;
+	const lo = floor - left;
+	const hi = right - floor;
+	if (!(hi > lo)) {
+		return 0;
+	}
+	return Math.min(hi, Math.max(lo, delta));
+}
+
+function pinDivider(slots: Picture[], join: number, left: number, right: number): Picture[] {
+	const unpinned = slots.filter((slot) => slot.dur == null).length;
+	const leftIsSlack = slots[join].dur == null;
+	const rightIsSlack = slots[join + 1].dur == null;
+	let pinLeft = true;
+	let pinRight = true;
+	if (slots.length === 2) {
+		pinRight = false;
+	} else if (leftIsSlack && unpinned === 1) {
+		pinLeft = false;
+	} else if (rightIsSlack && (unpinned === 1 || (leftIsSlack && unpinned === 2))) {
+		pinRight = false;
+	}
+	return slots.map((slot, i) => {
+		if (i === join) {
+			return pinLeft ? withDur(slot, left) : withoutDur(slot);
+		}
+		if (i === join + 1) {
+			return pinRight ? withDur(slot, right) : withoutDur(slot);
+		}
+		return slot;
+	});
+}
+
+/** blocksFromLengths draws clip lengths that overlap by the dissolve. */
+export function blocksFromLengths(srcs: string[], lengths: number[], dissolve: number): ScoreBlock[] {
+	if (!lengths.length || lengths.length !== srcs.length) {
+		return [];
+	}
+	const starts = [0];
+	for (let i = 0; i < lengths.length - 1; i++) {
+		starts.push(starts[i] + lengths[i] - dissolve);
+	}
+	const total = starts[starts.length - 1] + lengths[lengths.length - 1];
+	if (total <= 0) {
+		return [];
+	}
+	return srcs.map((src, i) => ({
+		src,
+		left: (starts[i] / total) * 100,
+		width: (lengths[i] / total) * 100
+	}));
 }
 
 export function sortByName(file: MontageFile): MontageFile {

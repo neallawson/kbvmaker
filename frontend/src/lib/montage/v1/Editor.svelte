@@ -7,13 +7,18 @@
 		addPictures,
 		applyLook,
 		baseName,
+		blocksFromLengths,
+		dropIndex,
 		moveSlot,
 		newProject,
 		mediaPath,
 		projectDir,
 		relativize,
 		removeSlot,
+		reorderSlot,
 		replaceSrc,
+		resizePictures,
+		resizedLengths,
 		scoreBlocks,
 		scoreJoins,
 		secondsLabel,
@@ -47,10 +52,16 @@
 	let pictureDraft = $state('');
 	let lengthDraft = $state<string | null>(null);
 	let thumbs = $state<Record<string, string>>({});
+	let trackEl = $state<HTMLDivElement | null>(null);
+	let preview = $state<{ lengths: number[]; dissolve: number } | null>(null);
+	let dragged = $state<number | null>(null);
+	let swallowClick = false;
 
 	const title = 'kbvmaker - Montage (v1) editor, renderer';
 	const thumbWidth = 320;
 	const thumbHeight = 180;
+	const gripWidth = 28;
+	const dragSlop = 4;
 
 	const looks: { id: LookId; label: string }[] = [
 		{ id: 'classic', label: 'Classic' },
@@ -247,7 +258,9 @@
 		}
 		const text = raw.trim();
 		if (!text) {
-			edit(setDur(doc, selected, null));
+			if ((doc.timing?.policy ?? 'fit-audio') === 'fit-audio') {
+				edit(setDur(doc, selected, null));
+			}
 			return;
 		}
 		const n = Number(text);
@@ -360,15 +373,128 @@
 	}
 
 	let blocks = $derived(scoreBlocks(doc?.slots, plan));
-	let joins = $derived(scoreJoins(blocks));
+	let shownBlocks = $derived(
+		preview && doc?.slots
+			? blocksFromLengths(
+					doc.slots.map((slot) => slot.src),
+					preview.lengths,
+					preview.dissolve
+				)
+			: blocks
+	);
+	let joins = $derived(scoreJoins(shownBlocks));
 
-	function sharesSong(file: MontageFile): boolean {
-		return (file.timing?.policy ?? 'fit-audio') === 'fit-audio';
+	function policyOf(file: MontageFile): string {
+		return file.timing?.policy ?? 'fit-audio';
+	}
+
+	function lengthLocked(file: MontageFile): boolean {
+		const policy = policyOf(file);
+		if (policy === 'fixed-clip') {
+			return true;
+		}
+		return policy === 'fit-audio' && (file.slots?.length ?? 0) < 2;
 	}
 
 	function choose(index: number) {
 		selected = index;
 		lengthDraft = null;
+	}
+
+	function onPictureClick(index: number) {
+		if (swallowClick) {
+			swallowClick = false;
+			return;
+		}
+		choose(index);
+	}
+
+	function pictureCenters(): number[] {
+		const rect = trackEl?.getBoundingClientRect();
+		if (!rect || rect.width <= 0) {
+			return [];
+		}
+		return blocks.map((block) => rect.left + ((block.left + block.width / 2) / 100) * rect.width);
+	}
+
+	function dissolveOf(file: MontageFile, join: number): number {
+		return plan?.slots[join]?.join?.duration ?? file.defaults?.join?.duration ?? 1.5;
+	}
+
+	function startPicture(event: PointerEvent, index: number) {
+		if (event.button !== 0 || !doc) {
+			return;
+		}
+		swallowClick = false;
+		const originX = event.clientX;
+		const originY = event.clientY;
+		let moved = false;
+		const move = (e: PointerEvent) => {
+			if (Math.hypot(e.clientX - originX, e.clientY - originY) < dragSlop) {
+				return;
+			}
+			moved = true;
+			dragged = index;
+		};
+		const up = (e: PointerEvent) => {
+			window.removeEventListener('pointermove', move);
+			window.removeEventListener('pointerup', up);
+			window.removeEventListener('pointercancel', up);
+			dragged = null;
+			if (!moved || !doc) {
+				return;
+			}
+			swallowClick = true;
+			const centers = pictureCenters();
+			if (!centers.length) {
+				return;
+			}
+			const to = dropIndex(centers, index, e.clientX);
+			selected = to;
+			const next = reorderSlot(doc, index, to);
+			if (next !== doc) {
+				edit(next);
+			}
+		};
+		window.addEventListener('pointermove', move);
+		window.addEventListener('pointerup', up);
+		window.addEventListener('pointercancel', up);
+	}
+
+	function startGrip(event: PointerEvent, join: number) {
+		if (event.button !== 0 || !doc || !plan || plan.duration <= 0) {
+			return;
+		}
+		event.stopPropagation();
+		const rect = trackEl?.getBoundingClientRect();
+		if (!rect || rect.width <= 0) {
+			return;
+		}
+		const file = doc;
+		const originX = event.clientX;
+		const film = plan.duration;
+		const width = rect.width;
+		const lengths = plan.slots.map((slot) => slot.clipDur);
+		const dissolve = dissolveOf(file, join);
+		const move = (e: PointerEvent) => {
+			const delta = ((e.clientX - originX) / width) * film;
+			const next = resizedLengths(lengths, join, delta, dissolve);
+			preview = next ? { lengths: next, dissolve } : null;
+		};
+		const up = (e: PointerEvent) => {
+			window.removeEventListener('pointermove', move);
+			window.removeEventListener('pointerup', up);
+			window.removeEventListener('pointercancel', up);
+			preview = null;
+			const delta = ((e.clientX - originX) / width) * film;
+			const next = resizePictures(file, lengths, join, delta, dissolve);
+			if (next !== file) {
+				edit(next);
+			}
+		};
+		window.addEventListener('pointermove', move);
+		window.addEventListener('pointerup', up);
+		window.addEventListener('pointercancel', up);
 	}
 </script>
 
@@ -462,23 +588,28 @@
 
 			<div class="flex flex-col gap-1" role="group" aria-labelledby="timeline-label">
 				<p id="timeline-label" class="text-sm font-medium">Timeline</p>
-				<div class="border-foreground/15 bg-foreground/10 relative h-16 overflow-hidden rounded-md border">
-					{#each blocks as block, index (block.src + index)}
+				<div
+					bind:this={trackEl}
+					data-timeline
+					class="border-foreground/15 bg-foreground/10 relative h-16 touch-none overflow-hidden rounded-md border"
+				>
+					{#each shownBlocks as block, index (block.src + index)}
 						<button
 							type="button"
-							class="mark absolute top-1 flex h-14 items-center justify-center overflow-hidden text-xs {selected === index
+							class="mark absolute top-1 flex h-14 cursor-grab items-center justify-center overflow-hidden text-xs {selected === index
 								? 'ring-primary z-10 ring-2 ring-inset'
-								: 'z-0'} bg-[oklch(0.78_0_0)]"
+								: 'z-0'} bg-[oklch(0.78_0_0)] {dragged === index ? 'z-10 cursor-grabbing opacity-80' : ''}"
 							style="left: {block.left}%; width: {block.width}%"
 							title={baseName(block.src)}
 							aria-label="{index + 1}. {baseName(block.src)}"
 							aria-pressed={selected === index}
-							onclick={() => choose(index)}
+							onpointerdown={(event) => startPicture(event, index)}
+							onclick={() => onPictureClick(index)}
 						>
 							{#if thumbFor(block.src)}
-								<img alt="" src={thumbFor(block.src)} class="absolute inset-0 h-full w-full object-cover" />
+								<img alt="" src={thumbFor(block.src)} draggable="false" class="pointer-events-none absolute inset-0 h-full w-full object-cover" />
 							{/if}
-							<span class="mark-n relative z-10 rounded bg-black/60 px-1 text-white">{index + 1}</span>
+							<span class="mark-n pointer-events-none relative z-10 rounded bg-black/60 px-1 text-white">{index + 1}</span>
 						</button>
 					{:else}
 						<p class="text-muted-foreground p-2 text-sm">Each picture shows up here as you add it.</p>
@@ -489,6 +620,16 @@
 							style="left: {join.left}%; width: {join.width}%"
 							data-join
 						></div>
+						<button
+							type="button"
+							class="absolute top-1 z-30 h-14 cursor-ew-resize"
+							style="left: {join.left + join.width / 2}%; width: {gripWidth}px; transform: translateX(-50%)"
+							aria-label="Change the lengths beside pictures {index + 1} and {index + 2}"
+							data-grip
+							onpointerdown={(event) => startGrip(event, index)}
+						>
+							<span class="pointer-events-none absolute inset-y-3 left-1/2 w-0.5 -translate-x-1/2 rounded bg-white"></span>
+						</button>
 					{/each}
 				</div>
 				{#if plan}
@@ -538,19 +679,19 @@
 									<input
 										class="border-input bg-background h-9 rounded-md border px-3"
 										aria-label="Length in seconds"
-										disabled={(doc.slots?.length ?? 0) < 2 || !sharesSong(doc)}
+										disabled={lengthLocked(doc)}
 										value={lengthValue()}
 										oninput={(event) => (lengthDraft = event.currentTarget.value)}
 										onchange={(event) => commitLength(event.currentTarget.value)}
 									/>
 								</label>
-								{#if !sharesSong(doc)}
+								{#if policyOf(doc) === 'fixed-clip'}
 									<p class="text-muted-foreground text-sm">This look uses the same length for every picture.</p>
-								{:else if (doc.slots?.length ?? 0) < 2}
+								{:else if policyOf(doc) === 'fit-audio' && (doc.slots?.length ?? 0) < 2}
 									<p class="text-muted-foreground text-sm">This picture runs for the whole song.</p>
 								{/if}
 								<div class="flex flex-wrap gap-2">
-									{#if slot.dur != null}
+									{#if policyOf(doc) === 'fit-audio' && slot.dur != null}
 										<Button variant="outline" onclick={() => edit(setDur(doc!, index, null))}>Share the rest</Button>
 									{/if}
 									<Button variant="outline" onclick={() => edit(moveSlot(doc!, index, -1))} disabled={index === 0}>Move up</Button>

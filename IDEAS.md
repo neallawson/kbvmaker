@@ -1007,7 +1007,8 @@ that picture.
 
 One picture is the whole song. Its length is shown and is not editable.
 
-The score draws these resolved lengths. It does not edit them.
+The timeline draws these resolved lengths. Dragging a dissolve to change
+them is under Timeline editing.
 
 ### Editor
 
@@ -1020,18 +1021,19 @@ they were picked. That order is the slot list, and it is what a later
 rebuild uses. Sort by name, move up, and move down each write that list
 once. A new file appearing in a folder does not reorder anything.
 
-The timeline is read-only and labeled Timeline. Each picture appears on it
-as soon as it is added, at an equal width. The block shows a thumbnail, and
-its number when the block is wide enough. The same thumbnail sits beside the
-name in the list. The file name is the block's tooltip. Thumbnails are
+The timeline is labeled Timeline. Each picture appears on it as soon as it
+is added, at an equal width. The block shows a thumbnail, and its number
+when the block is wide enough. The same thumbnail sits beside the name in
+the list. The file name is the block's tooltip. Thumbnails are
 `POST /v1/thumbnail`: the client names a path and a pixel size, and the
 reply is a base64 JPEG of exactly that size, cover-cropped. When the song
 is known, the blocks take their clip lengths, a darker band marks each
 dissolve, and the axis runs from 0:00 to the film's length. Selecting a
-row outlines that block. Clicking a block only selects the same row. The
-song's length, in
-minutes:seconds and in seconds, sits beside its name. A file dialog opens
-again in the folder it used last.
+row outlines that block. A press that does not travel selects that row.
+Dragging a picture reorders it, and dragging the grip in a dissolve
+changes the two lengths, as described under Timeline editing. The song's
+length, in minutes:seconds and in seconds, sits beside its name. A file
+dialog opens again in the folder it used last.
 
 The selected row sets the move by its plain name, and the length box
 described above. Remove and replace change that picture's file. Shuffle
@@ -1062,10 +1064,60 @@ Enter and exit stills, a per-picture fill, and a live ffmpeg stream are not
 part of this screen yet. The length box and the move name are the picture
 edit.
 
+### Timeline editing
+
+Two gestures. Each one changes how the pictures share
+the film. The width of a block is that picture's time on screen, drawn to
+scale. The list and the timeline keep one order and one set of lengths.
+The length box stays the place a number is typed. Save is still the button
+that writes the Montage to disk.
+
+Drag a picture along the timeline and drop it. That writes the same slot
+list as Move up and Move down. The picture keeps its file, its move, and
+its pin, and it stays selected. A press that does not travel still selects
+that row. The picture can be dropped anywhere on the timeline. Each
+picture's center splits the timeline into the places it can land. A drop
+between two centers sits between those two pictures: the one on the left
+and the one on the right. A drop on a center counts as the left side of
+that center, so every point on the timeline is a landing place. A drop at
+or left of the first picture's center makes the dropped picture first, and
+the old first picture moves to second. A drop right of the last picture's
+center makes the dropped picture last. This works before a song is chosen,
+while every block has the same width.
+
+A press on a picture selects it when the pointer does not travel, and
+reorders it when the pointer does. A press on the grip in a dissolve
+changes the two lengths. The grip is a short vertical mark in the center
+of the darker band, and the pointer becomes a left-right arrow over it.
+Its grab area is wide enough to take a press comfortably. The mark may be
+drawn narrower than that area.
+The rest of the band still shows the dissolve and still belongs to the
+pictures underneath, so selecting or reordering a picture stays possible
+there. Drag the grip sideways and time moves from one neighbor to the
+other. The film's length stays. Both blocks follow the pointer, because
+their widths are those times. Releasing the pointer updates the open
+project, which is then unsaved until Save. One picture has no band. Its
+length is the song, and it is not dragged.
+
+Classic and Photo film stay `fit-audio`. The drag stores a `dur` pin on
+each of the two pictures, changed by opposite amounts, so every other
+picture keeps the length it had. One picture in the file still has to stay
+unpinned and absorb the song. When one of the two is that picture, only the
+other is pinned. With only two pictures, one pin is enough. The drag stops
+when either picture would become as short as the dissolve. Clearing the
+length box still puts that picture back in the share.
+
+Quick slides is `fixed-clip`. Every picture has one length, and the film is
+not the song. The first divider drag leaves that policy: it writes each
+picture's current length as `dur`, sets `timing` to `explicit`, then applies
+the same exchange. Applying Quick slides again clears those lengths and
+returns to one shared clip. Until a fit-audio Look is applied, the length
+box keeps a number. There is no share to return to.
+
 ### Screens
 
 One screen. New or Open, the song, the picture list, three Looks with one
-selected, the read-only timeline, and Save, Export shell script, and Render.
+selected, the timeline, and Save, Export shell script, and Render.
 A line under the timeline says how it will come out, in plain words: how many
 pictures, about how long each one stays, and that it dissolves between them.
 That is the check before a render. It does not mention zoom span or fill zoom.

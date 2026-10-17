@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
 	addPictures,
 	applyLook,
+	dropIndex,
 	moveSlot,
 	newProject,
 	relativize,
+	reorderSlot,
+	resizePictures,
 	scoreBlocks,
 	scoreJoins,
 	setAudio,
@@ -99,6 +102,85 @@ describe('project edits', () => {
 		expect(shuffleSlots(file, random).slots?.map((slot) => slot.src)).toEqual(['b.jpg', 'a.jpg', 'c.jpg']);
 		const moves = shuffleMoves(file, () => 0.99).slots?.map((slot) => slot.mode);
 		expect(moves).toEqual(['hold', 'hold', 'hold']);
+	});
+
+	it('drops a picture by the centers on the timeline', () => {
+		const centers = [10, 50, 90];
+		expect(dropIndex(centers, 1, 10)).toBe(0);
+		expect(dropIndex(centers, 1, 0)).toBe(0);
+		expect(dropIndex(centers, 2, 10)).toBe(0);
+		expect(dropIndex(centers, 0, 100)).toBe(2);
+		expect(dropIndex(centers, 1, 100)).toBe(2);
+		expect(dropIndex(centers, 0, 90)).toBe(1);
+		expect(dropIndex(centers, 2, 30)).toBe(1);
+		expect(dropIndex(centers, 0, 70)).toBe(1);
+		expect(dropIndex(centers, 1, 50)).toBe(1);
+		expect(dropIndex(centers, 1, 70)).toBe(1);
+	});
+
+	it('reorders a picture and keeps its pin', () => {
+		let file = setDur(addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg'], 'classic'), 2, 8);
+		file = reorderSlot(file, 2, 0);
+		expect(file.slots?.map((slot) => slot.src)).toEqual(['c.jpg', 'a.jpg', 'b.jpg']);
+		expect(file.slots?.[0].dur).toBe(8);
+		expect(reorderSlot(file, 0, 0)).toBe(file);
+	});
+
+	it('pins the two pictures around a divider and leaves the rest sharing', () => {
+		const file = addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg'], 'classic');
+		const next = resizePictures(file, [8, 8, 8], 0, 2, 1);
+		expect(next.timing).toEqual({ policy: 'fit-audio' });
+		expect(next.slots?.map((slot) => slot.dur)).toEqual([10, 6, undefined]);
+	});
+
+	it('pins one of two pictures so the other keeps absorbing the song', () => {
+		const file = addPictures(newProject(), ['a.jpg', 'b.jpg'], 'classic');
+		const next = resizePictures(file, [10.5, 10.5], 0, 1, 1);
+		expect(next.slots?.map((slot) => slot.dur)).toEqual([11.5, undefined]);
+	});
+
+	it('keeps already pinned neighbors and the picture that still shares', () => {
+		let file = addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg'], 'classic');
+		file = setDur(setDur(file, 0, 10), 1, 8);
+		const next = resizePictures(file, [10, 8, 6], 0, 1, 1);
+		expect(next.slots?.map((slot) => slot.dur)).toEqual([11, 7, undefined]);
+	});
+
+	it('lets the unpinned picture on the left absorb the divider drag', () => {
+		let file = addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg'], 'classic');
+		file = setDur(setDur(file, 1, 10), 2, 6);
+		const next = resizePictures(file, [6, 10, 6], 0, 1, 1);
+		expect(next.slots?.map((slot) => slot.dur)).toEqual([undefined, 9, 6]);
+	});
+
+	it('lets the only unpinned picture absorb the divider drag', () => {
+		let file = addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg'], 'classic');
+		file = setDur(setDur(file, 0, 10), 1, 6);
+		const next = resizePictures(file, [10, 6, 6], 1, 1, 1);
+		expect(next.slots?.map((slot) => slot.dur)).toEqual([10, 7, undefined]);
+	});
+
+	it('stops the divider when a picture would be as short as the dissolve', () => {
+		const file = addPictures(newProject(), ['a.jpg', 'b.jpg'], 'classic');
+		const next = resizePictures(file, [10, 10], 0, 100, 1);
+		expect(next.slots?.[0].dur).toBeCloseTo(18.999, 3);
+		expect(next.slots?.[1].dur).toBeUndefined();
+	});
+
+	it('leaves fixed-clip when a divider gives each picture its own length', () => {
+		let file = applyLook(addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg'], 'classic'), 'quick-slides');
+		file = resizePictures(file, [5, 5, 5], 0, 1, 0.5);
+		expect(file.timing).toEqual({ policy: 'explicit' });
+		expect(file.slots?.map((slot) => slot.dur)).toEqual([6, 4, 5]);
+	});
+
+	it('unpins the last picture when a fit-audio look would pin every one', () => {
+		let file = applyLook(addPictures(newProject(), ['a.jpg', 'b.jpg'], 'classic'), 'quick-slides');
+		file = resizePictures(file, [5, 5], 0, 1, 0.5);
+		file = applyLook(file, 'classic');
+		expect(file.timing).toEqual({ policy: 'fit-audio' });
+		expect(file.slots?.[0].dur).toBe(6);
+		expect(file.slots?.[1].dur).toBeUndefined();
 	});
 
 	it('keeps paths inside the project directory relative', () => {

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Client, MontageFile } from './client';
@@ -48,6 +48,7 @@ function client(read?: MontageFile): { client: Client; plans: MontageFile[] } {
 					montage: 1,
 					audio: read.audio,
 					timing: read.timing,
+					defaults: read.defaults,
 					slots: read.slots?.map((slot) => ({ ...slot }))
 				};
 			},
@@ -196,4 +197,104 @@ describe('Editor', () => {
 			false
 		);
 	});
+
+	it('drops a picture into a new place on the timeline', async () => {
+		const user = userEvent.setup();
+		const api = client();
+		render(Editor, { client: api.client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/b.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+
+		const timeline = screen.getByRole('group', { name: 'Timeline' });
+		stubTrack();
+		const moving = within(timeline).getByRole('button', { name: '2. b.jpg' });
+		await user.pointer([
+			{ keys: '[MouseLeft>]', target: moving },
+			{ coords: { x: 10, y: 8 } },
+			{ keys: '[/MouseLeft]' }
+		]);
+
+		expect(within(timeline).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+			'1. b.jpg',
+			'2. a.jpg'
+		]);
+		expect(screen.getByText('Unsaved changes')).toBeTruthy();
+		expect(api.plans).toEqual([]);
+	});
+
+	it('selects a picture when the press does not travel', async () => {
+		const user = userEvent.setup();
+		render(Editor, { client: client().client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/b.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.click(within(screen.getByRole('group', { name: 'Timeline' })).getByRole('button', { name: '2. b.jpg' }));
+		expect(screen.getByRole('button', { name: '2. b.jpg', pressed: true })).toBeTruthy();
+	});
+
+	it('drags a dissolve grip to give time to one picture and take it from the next', async () => {
+		const user = userEvent.setup();
+		const api = client({
+			montage: 1,
+			audio: 'song.mp3',
+			timing: { policy: 'fit-audio' },
+			defaults: { join: { type: 'fade', duration: 1 } },
+			slots: [
+				{ src: 'a.jpg', mode: 'in-center' },
+				{ src: 'b.jpg', mode: 'out-center' }
+			]
+		});
+		let saved = false;
+		api.client.save = async () => {
+			saved = true;
+		};
+		render(Editor, { client: api.client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+
+		const timeline = await screen.findByRole('group', { name: 'Timeline' });
+		await within(timeline).findByText('0:00');
+		stubTrack();
+		const grip = within(timeline).getByRole('button', { name: 'Change the lengths beside pictures 1 and 2' });
+		expect(grip.style.width).toBe('28px');
+		expect(grip.querySelector('span')?.className).toContain('w-0.5');
+		fireEvent.pointerDown(grip, { clientX: 0, clientY: 8, button: 0 });
+		fireEvent.pointerMove(window, { clientX: 20, clientY: 8, button: 0 });
+		await waitFor(() => {
+			expect(parseFloat(within(timeline).getByRole('button', { name: '1. a.jpg' }).style.width)).toBeGreaterThan(50);
+		});
+		fireEvent.pointerUp(window, { clientX: 20, clientY: 8, button: 0 });
+
+		await waitFor(() => {
+			expect(api.plans.at(-1)?.slots?.map((slot) => slot.dur)).toEqual([12, undefined]);
+		});
+		expect(screen.getByText('Unsaved changes')).toBeTruthy();
+		expect(saved).toBe(false);
+		expect(screen.getByRole('button', { name: 'Share the rest' })).toBeTruthy();
+	});
 });
+
+function stubTrack() {
+	const track = document.querySelector('[data-timeline]') as HTMLElement;
+	track.getBoundingClientRect = () =>
+		({
+			left: 0,
+			top: 0,
+			width: 200,
+			height: 64,
+			right: 200,
+			bottom: 64,
+			x: 0,
+			y: 0,
+			toJSON() {
+				return {};
+			}
+		}) as DOMRect;
+}

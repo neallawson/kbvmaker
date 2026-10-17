@@ -48,7 +48,7 @@ export interface MontageFile {
 		zoomSpan?: number;
 		ease?: 'linear';
 	};
-	timing?: { policy: 'fit-audio' | 'fixed-clip'; clip?: number };
+	timing?: { policy: 'fit-audio' | 'fixed-clip' | 'explicit'; clip?: number };
 	slots?: Picture[];
 }
 
