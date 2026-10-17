@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Client, MontageFile } from './client';
@@ -77,6 +78,7 @@ describe('Editor', () => {
 		expect(buttons?.textContent).toContain('Unsaved changes');
 		expect(screen.getByRole('button', { name: 'Classic' }).getAttribute('aria-pressed')).toBe('true');
 		expect(screen.getByText('Each picture shows up here as you add it.')).toBeTruthy();
+		expect(document.querySelectorAll('[data-timeline] .film-rail')).toHaveLength(2);
 	});
 
 	it('shows a picture on the timeline before a song is chosen', async () => {
@@ -270,11 +272,19 @@ describe('Editor', () => {
 		await waitFor(() => {
 			expect(parseFloat(within(timeline).getByRole('button', { name: '1. a.jpg' }).style.width)).toBeGreaterThan(50);
 		});
+		const draggedWidth = parseFloat(within(timeline).getByRole('button', { name: '1. a.jpg' }).style.width);
 		fireEvent.pointerUp(window, { clientX: 20, clientY: 8, button: 0 });
+		await tick();
+		expect(parseFloat(within(timeline).getByRole('button', { name: '1. a.jpg' }).style.width)).toBeCloseTo(
+			draggedWidth
+		);
 
 		await waitFor(() => {
 			expect(api.plans.at(-1)?.slots?.map((slot) => slot.dur)).toEqual([12, undefined]);
 		});
+		expect(parseFloat(within(timeline).getByRole('button', { name: '1. a.jpg' }).style.width)).toBeCloseTo(
+			draggedWidth
+		);
 		expect(screen.getByText('Unsaved changes')).toBeTruthy();
 		expect(saved).toBe(false);
 		expect(screen.getByRole('button', { name: 'Share the rest' })).toBeTruthy();

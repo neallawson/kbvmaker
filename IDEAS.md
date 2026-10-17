@@ -1021,8 +1021,10 @@ they were picked. That order is the slot list, and it is what a later
 rebuild uses. Sort by name, move up, and move down each write that list
 once. A new file appearing in a folder does not reorder anything.
 
-The timeline is labeled Timeline. Each picture appears on it as soon as it
-is added, at an equal width. The block shows a thumbnail, and its number
+The timeline is labeled Timeline. Black rails on the top and bottom carry a
+repeating row of sprocket holes, so the strip reads as film. The holes are
+fixed to the strip. Each picture appears in the band between the rails as
+soon as it is added, at an equal width. The block shows a thumbnail, and its number
 when the block is wide enough. The same thumbnail sits beside the name in
 the list. The file name is the block's tooltip. Thumbnails are
 `POST /v1/thumbnail`: the client names a path and a pixel size, and the

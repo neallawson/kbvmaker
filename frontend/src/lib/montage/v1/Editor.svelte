@@ -54,6 +54,8 @@
 	let thumbs = $state<Record<string, string>>({});
 	let trackEl = $state<HTMLDivElement | null>(null);
 	let preview = $state<{ lengths: number[]; dissolve: number } | null>(null);
+	/** gripCommit keeps the drag on screen until the plan draws those same blocks. */
+	let gripCommit = $state(false);
 	let dragged = $state<number | null>(null);
 	let swallowClick = false;
 
@@ -80,14 +82,27 @@
 		client
 			.planBody(current, dir)
 			.then((next) => {
-				if (live) {
-					plan = next;
-					if (next.song != null) {
-						songSeconds = next.song;
-					}
-					error = '';
-					errorSlot = 0;
+				if (!live) {
+					return;
 				}
+				plan = next;
+				if (gripCommit && preview && doc?.slots) {
+					const fromPlan = scoreBlocks(doc.slots, next);
+					const fromDrag = blocksFromLengths(
+						doc.slots.map((slot) => slot.src),
+						preview.lengths,
+						preview.dissolve
+					);
+					if (sameBlocks(fromPlan, fromDrag)) {
+						preview = null;
+						gripCommit = false;
+					}
+				}
+				if (next.song != null) {
+					songSeconds = next.song;
+				}
+				error = '';
+				errorSlot = 0;
 			})
 			.catch((err: unknown) => {
 				if (!live) {
@@ -139,10 +154,14 @@
 		return thumbs[mediaPath(projectDir(filePath), src)] ?? '';
 	}
 
-	function edit(next: MontageFile) {
+	function edit(next: MontageFile, holdPreview = false) {
 		doc = next;
 		dirty = true;
 		lengthDraft = null;
+		if (!holdPreview) {
+			preview = null;
+			gripCommit = false;
+		}
 	}
 
 	function start(path: string) {
@@ -373,6 +392,15 @@
 	}
 
 	let blocks = $derived(scoreBlocks(doc?.slots, plan));
+
+	function sameBlocks(a: { left: number; width: number }[], b: { left: number; width: number }[]): boolean {
+		return (
+			a.length === b.length &&
+			a.every(
+				(block, i) => Math.abs(block.left - b[i].left) < 0.2 && Math.abs(block.width - b[i].width) < 0.2
+			)
+		);
+	}
 	let shownBlocks = $derived(
 		preview && doc?.slots
 			? blocksFromLengths(
@@ -485,12 +513,15 @@
 			window.removeEventListener('pointermove', move);
 			window.removeEventListener('pointerup', up);
 			window.removeEventListener('pointercancel', up);
-			preview = null;
 			const delta = ((e.clientX - originX) / width) * film;
 			const next = resizePictures(file, lengths, join, delta, dissolve);
 			if (next !== file) {
-				edit(next);
+				gripCommit = true;
+				edit(next, true);
+				return;
 			}
+			preview = null;
+			gripCommit = false;
 		};
 		window.addEventListener('pointermove', move);
 		window.addEventListener('pointerup', up);
@@ -591,12 +622,14 @@
 				<div
 					bind:this={trackEl}
 					data-timeline
-					class="border-foreground/15 bg-foreground/10 relative h-16 touch-none overflow-hidden rounded-md border"
+					class="border-foreground/15 bg-foreground/10 relative flex h-20 items-center touch-none overflow-hidden rounded-md border"
 				>
+					<div class="film-rail pointer-events-none absolute inset-x-0 top-0 z-40 h-2.5" aria-hidden="true"></div>
+					<div class="film-rail pointer-events-none absolute inset-x-0 bottom-0 z-40 h-2.5" aria-hidden="true"></div>
 					{#each shownBlocks as block, index (block.src + index)}
 						<button
 							type="button"
-							class="mark absolute top-1 flex h-14 cursor-grab items-center justify-center overflow-hidden text-xs {selected === index
+							class="mark absolute top-2.5 bottom-2.5 flex cursor-grab items-center justify-center overflow-hidden text-xs {selected === index
 								? 'ring-primary z-10 ring-2 ring-inset'
 								: 'z-0'} bg-[oklch(0.78_0_0)] {dragged === index ? 'z-10 cursor-grabbing opacity-80' : ''}"
 							style="left: {block.left}%; width: {block.width}%"
@@ -616,13 +649,13 @@
 					{/each}
 					{#each joins as join, index (join.left + '-' + index)}
 						<div
-							class="pointer-events-none absolute top-1 z-20 h-14 bg-[oklch(0.5_0_0)]"
+							class="pointer-events-none absolute top-2.5 bottom-2.5 z-20 bg-[oklch(0.5_0_0)]"
 							style="left: {join.left}%; width: {join.width}%"
 							data-join
 						></div>
 						<button
 							type="button"
-							class="absolute top-1 z-30 h-14 cursor-ew-resize"
+							class="absolute top-2.5 bottom-2.5 z-30 cursor-ew-resize"
 							style="left: {join.left + join.width / 2}%; width: {gripWidth}px; transform: translateX(-50%)"
 							aria-label="Change the lengths beside pictures {index + 1} and {index + 2}"
 							data-grip
@@ -742,6 +775,17 @@
 </main>
 
 <style>
+	.film-rail {
+		background: #000;
+		-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='10'%3E%3Cpath fill='white' fill-rule='evenodd' d='M0 0h16v10H0zM5.5 2h5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z'/%3E%3C/svg%3E");
+		mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='10'%3E%3Cpath fill='white' fill-rule='evenodd' d='M0 0h16v10H0zM5.5 2h5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z'/%3E%3C/svg%3E");
+		-webkit-mask-size: 16px 10px;
+		mask-size: 16px 10px;
+		-webkit-mask-repeat: repeat-x;
+		mask-repeat: repeat-x;
+		-webkit-mask-position: left center;
+		mask-position: left center;
+	}
 	.mark {
 		container-type: inline-size;
 	}
