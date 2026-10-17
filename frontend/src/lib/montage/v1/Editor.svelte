@@ -8,7 +8,9 @@
 		applyLook,
 		baseName,
 		blocksFromLengths,
+		dragLayout,
 		dropIndex,
+		settledLayout,
 		moveSlot,
 		newProject,
 		mediaPath,
@@ -56,7 +58,11 @@
 	let preview = $state<{ lengths: number[]; dissolve: number } | null>(null);
 	/** gripCommit keeps the drag on screen until the plan draws those same blocks. */
 	let gripCommit = $state(false);
-	let dragged = $state<number | null>(null);
+	/** lift is the picture following the pointer, and the gap where it will land. */
+	let lift = $state<{ index: number; to: number; left: number; width: number } | null>(null);
+	/** reorderHold keeps the landed order on screen until the plan draws it. */
+	let reorderHold = $state<ReturnType<typeof settledLayout> | null>(null);
+	let dragArmed = $state(false);
 	let swallowClick = false;
 
 	const title = 'kbvmaker - Montage (v1) editor, renderer';
@@ -86,6 +92,9 @@
 					return;
 				}
 				plan = next;
+				if (reorderHold && doc?.slots && sameBlocks(scoreBlocks(doc.slots, next), reorderHold)) {
+					reorderHold = null;
+				}
 				if (gripCommit && preview && doc?.slots) {
 					const fromPlan = scoreBlocks(doc.slots, next);
 					const fromDrag = blocksFromLengths(
@@ -109,6 +118,7 @@
 					return;
 				}
 				plan = null;
+				reorderHold = null;
 				if (err instanceof RuleError) {
 					error = err.message;
 					errorSlot = err.slot;
@@ -162,6 +172,7 @@
 			preview = null;
 			gripCommit = false;
 		}
+		reorderHold = null;
 	}
 
 	function start(path: string) {
@@ -172,6 +183,8 @@
 		dirty = true;
 		error = '';
 		plan = null;
+		reorderHold = null;
+		lift = null;
 		songSeconds = null;
 	}
 
@@ -401,16 +414,24 @@
 			)
 		);
 	}
-	let shownBlocks = $derived(
-		preview && doc?.slots
-			? blocksFromLengths(
-					doc.slots.map((slot) => slot.src),
-					preview.lengths,
-					preview.dissolve
-				)
-			: blocks
-	);
-	let joins = $derived(scoreJoins(shownBlocks));
+	let placed = $derived.by(() => {
+		if (lift && blocks.length) {
+			return dragLayout(blocks, lift.index, lift.to);
+		}
+		if (reorderHold) {
+			return reorderHold.map((block, slot) => ({ ...block, slot }));
+		}
+		const source =
+			preview && doc?.slots
+				? blocksFromLengths(
+						doc.slots.map((slot) => slot.src),
+						preview.lengths,
+						preview.dissolve
+					)
+				: blocks;
+		return source.map((block, slot) => ({ ...block, slot }));
+	});
+	let joins = $derived(scoreJoins(placed));
 
 	function policyOf(file: MontageFile): string {
 		return file.timing?.policy ?? 'fit-audio';
@@ -454,34 +475,61 @@
 			return;
 		}
 		swallowClick = false;
+		dragArmed = true;
+		try {
+			trackEl?.setPointerCapture(event.pointerId);
+		} catch {
+			// The track keeps the gesture after the picture lifts off it.
+		}
 		const originX = event.clientX;
 		const originY = event.clientY;
 		let moved = false;
+		let grabOffset = 0;
 		const move = (e: PointerEvent) => {
-			if (Math.hypot(e.clientX - originX, e.clientY - originY) < dragSlop) {
+			const rect = trackEl?.getBoundingClientRect();
+			const block = blocks[index];
+			if (!rect || rect.width <= 0 || !block) {
 				return;
 			}
-			moved = true;
-			dragged = index;
+			if (!moved) {
+				if (Math.hypot(e.clientX - originX, e.clientY - originY) < dragSlop) {
+					return;
+				}
+				moved = true;
+				grabOffset = e.clientX - (rect.left + (block.left / 100) * rect.width);
+				document.body.style.cursor = 'grabbing';
+			}
+			const width = (block.width / 100) * rect.width;
+			let left = e.clientX - rect.left - grabOffset;
+			if (left < 0) {
+				left = 0;
+			}
+			if (left > rect.width - width) {
+				left = Math.max(0, rect.width - width);
+			}
+			lift = { index, to: dropIndex(pictureCenters(), index, e.clientX), left, width };
 		};
-		const up = (e: PointerEvent) => {
+		const up = () => {
 			window.removeEventListener('pointermove', move);
 			window.removeEventListener('pointerup', up);
 			window.removeEventListener('pointercancel', up);
-			dragged = null;
-			if (!moved || !doc) {
+			document.body.style.cursor = '';
+			const to = lift?.to;
+			const landed = moved && to != null && plan && plan.duration > 0 ? settledLayout(blocks, index, to) : null;
+			lift = null;
+			dragArmed = false;
+			if (!moved || !doc || to == null) {
 				return;
 			}
 			swallowClick = true;
-			const centers = pictureCenters();
-			if (!centers.length) {
+			if (!pictureCenters().length) {
 				return;
 			}
-			const to = dropIndex(centers, index, e.clientX);
 			selected = to;
 			const next = reorderSlot(doc, index, to);
 			if (next !== doc) {
 				edit(next);
+				reorderHold = landed;
 			}
 		};
 		window.addEventListener('pointermove', move);
@@ -619,51 +667,71 @@
 
 			<div class="flex flex-col gap-1" role="group" aria-labelledby="timeline-label">
 				<p id="timeline-label" class="text-sm font-medium">Timeline</p>
+				<div class="relative">
 				<div
 					bind:this={trackEl}
 					data-timeline
-					class="border-foreground/15 bg-foreground/10 relative flex h-20 items-center touch-none overflow-hidden rounded-md border"
+					class="border-foreground/15 bg-foreground/10 relative flex h-20 items-center touch-none overflow-hidden rounded-md border {lift ? 'cursor-grabbing' : ''}"
 				>
 					<div class="film-rail pointer-events-none absolute inset-x-0 top-0 z-40 h-2.5" aria-hidden="true"></div>
 					<div class="film-rail pointer-events-none absolute inset-x-0 bottom-0 z-40 h-2.5" aria-hidden="true"></div>
-					{#each shownBlocks as block, index (block.src + index)}
+					{#each placed as block (block.src + block.slot)}
 						<button
 							type="button"
-							class="mark absolute top-2.5 bottom-2.5 flex cursor-grab items-center justify-center overflow-hidden text-xs {selected === index
+							class="mark absolute top-2.5 bottom-2.5 flex cursor-grab items-center justify-center overflow-hidden text-xs {selected === block.slot
 								? 'ring-primary z-10 ring-2 ring-inset'
-								: 'z-0'} bg-[oklch(0.78_0_0)] {dragged === index ? 'z-10 cursor-grabbing opacity-80' : ''}"
+								: 'z-0'} bg-[oklch(0.78_0_0)] {dragArmed ? 'slot-move' : ''}"
 							style="left: {block.left}%; width: {block.width}%"
 							title={baseName(block.src)}
-							aria-label="{index + 1}. {baseName(block.src)}"
-							aria-pressed={selected === index}
-							onpointerdown={(event) => startPicture(event, index)}
-							onclick={() => onPictureClick(index)}
+							aria-label="{block.slot + 1}. {baseName(block.src)}"
+							aria-pressed={selected === block.slot}
+							onpointerdown={(event) => startPicture(event, block.slot)}
+							onclick={() => onPictureClick(block.slot)}
 						>
 							{#if thumbFor(block.src)}
 								<img alt="" src={thumbFor(block.src)} draggable="false" class="pointer-events-none absolute inset-0 h-full w-full object-cover" />
 							{/if}
-							<span class="mark-n pointer-events-none relative z-10 rounded bg-black/60 px-1 text-white">{index + 1}</span>
+							<span class="mark-n pointer-events-none relative z-10 rounded bg-black/60 px-1 text-white">{block.slot + 1}</span>
 						</button>
-					{:else}
-						<p class="text-muted-foreground p-2 text-sm">Each picture shows up here as you add it.</p>
 					{/each}
+					{#if placed.length === 0 && !lift}
+						<p class="text-muted-foreground p-2 text-sm">Each picture shows up here as you add it.</p>
+					{/if}
 					{#each joins as join, index (join.left + '-' + index)}
 						<div
-							class="pointer-events-none absolute top-2.5 bottom-2.5 z-20 bg-[oklch(0.5_0_0)]"
+							class="pointer-events-none absolute top-2.5 bottom-2.5 z-20 bg-[oklch(0.5_0_0)] {dragArmed ? 'slot-move' : ''}"
 							style="left: {join.left}%; width: {join.width}%"
 							data-join
 						></div>
-						<button
-							type="button"
-							class="absolute top-2.5 bottom-2.5 z-30 cursor-ew-resize"
-							style="left: {join.left + join.width / 2}%; width: {gripWidth}px; transform: translateX(-50%)"
-							aria-label="Change the lengths beside pictures {index + 1} and {index + 2}"
-							data-grip
-							onpointerdown={(event) => startGrip(event, index)}
-						>
-							<span class="pointer-events-none absolute inset-y-3 left-1/2 w-0.5 -translate-x-1/2 rounded bg-white"></span>
-						</button>
+						{#if !lift}
+							<button
+								type="button"
+								class="absolute top-2.5 bottom-2.5 z-30 cursor-ew-resize"
+								style="left: {join.left + join.width / 2}%; width: {gripWidth}px; transform: translateX(-50%)"
+								aria-label="Change the lengths beside pictures {index + 1} and {index + 2}"
+								data-grip
+								onpointerdown={(event) => startGrip(event, index)}
+							>
+								<span class="pointer-events-none absolute inset-y-3 left-1/2 w-0.5 -translate-x-1/2 rounded bg-white"></span>
+							</button>
+						{/if}
 					{/each}
+				</div>
+				{#if lift && blocks[lift.index]}
+					<div
+						class="pointer-events-none absolute -top-1.5 -bottom-1.5 z-50 overflow-hidden rounded-sm shadow-[0_8px_18px_rgba(0,0,0,0.45)]"
+						style="left: {lift.left}px; width: {lift.width}px"
+						data-lift
+						aria-hidden="true"
+					>
+						{#if thumbFor(blocks[lift.index].src)}
+							<img alt="" src={thumbFor(blocks[lift.index].src)} draggable="false" class="absolute inset-0 h-full w-full object-cover" />
+						{:else}
+							<div class="absolute inset-0 bg-[oklch(0.78_0_0)]"></div>
+						{/if}
+						<span class="pointer-events-none absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded bg-black/60 px-1 text-xs text-white">{lift.index + 1}</span>
+					</div>
+				{/if}
 				</div>
 				{#if plan}
 					<div class="text-muted-foreground flex justify-between text-xs tabular-nums">
@@ -785,6 +853,11 @@
 		mask-repeat: repeat-x;
 		-webkit-mask-position: left center;
 		mask-position: left center;
+	}
+	.slot-move {
+		transition:
+			left 120ms ease-out,
+			width 120ms ease-out;
 	}
 	.mark {
 		container-type: inline-size;

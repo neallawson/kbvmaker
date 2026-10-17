@@ -140,6 +140,53 @@ export function dropIndex(centers: number[], from: number, at: number): number {
 	return to;
 }
 
+/**
+ * dragLayout lifts `from` out of the strip and leaves a gap of its width at `to`.
+ * The other pictures keep their widths and their dissolve overlap, and slide together.
+ */
+export function dragLayout(blocks: ScoreBlock[], from: number, to: number): DragBlock[] {
+	const order = movedOrder(blocks, from, to);
+	if (!order) {
+		return blocks.map((block, slot) => ({ ...block, slot }));
+	}
+	return packBlocks(blocks, order).flatMap((block, index) =>
+		order[index] === from ? [] : [{ ...block, slot: order[index] }]
+	);
+}
+
+/** settledLayout is the strip after `from` lands on `to`, with the held picture back in the gap. */
+export function settledLayout(blocks: ScoreBlock[], from: number, to: number): ScoreBlock[] {
+	const order = movedOrder(blocks, from, to);
+	if (!order || from === to) {
+		return blocks.map((block) => ({ ...block }));
+	}
+	return packBlocks(blocks, order);
+}
+
+function movedOrder(blocks: ScoreBlock[], from: number, to: number): number[] | null {
+	const n = blocks.length;
+	if (n === 0 || from < 0 || from >= n || to < 0 || to >= n) {
+		return null;
+	}
+	const order = blocks.map((_, index) => index);
+	const [held] = order.splice(from, 1);
+	order.splice(to, 0, held);
+	return order;
+}
+
+function packBlocks(blocks: ScoreBlock[], order: number[]): ScoreBlock[] {
+	const overlap = blocks.length > 1 ? Math.max(0, blocks[0].left + blocks[0].width - blocks[1].left) : 0;
+	let cursor = 0;
+	return order.map((slot, index) => {
+		const width = blocks[slot].width;
+		const block = { src: blocks[slot].src, left: cursor, width };
+		if (index < order.length - 1) {
+			cursor += width - overlap;
+		}
+		return block;
+	});
+}
+
 export function removeSlot(file: MontageFile, index: number): MontageFile {
 	return { ...file, slots: (file.slots ?? []).filter((_, i) => i !== index) };
 }
@@ -343,6 +390,11 @@ export interface ScoreBlock {
 	src: string;
 	left: number;
 	width: number;
+}
+
+/** DragBlock is a picture that stays on the strip while another is held. `slot` is its place in the film. */
+export interface DragBlock extends ScoreBlock {
+	slot: number;
 }
 
 /** scoreBlocks lays out the pictures already added. A plan replaces equal widths with clip lengths. */

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
 	addPictures,
 	applyLook,
+	dragLayout,
+	settledLayout,
 	dropIndex,
 	moveSlot,
 	newProject,
@@ -116,6 +118,37 @@ describe('project edits', () => {
 		expect(dropIndex(centers, 0, 70)).toBe(1);
 		expect(dropIndex(centers, 1, 50)).toBe(1);
 		expect(dropIndex(centers, 1, 70)).toBe(1);
+	});
+
+	it('opens a gap the width of the held picture', () => {
+		const even = [
+			{ src: 'a', left: 0, width: 50 },
+			{ src: 'b', left: 50, width: 50 }
+		];
+		expect(dragLayout(even, 1, 0)).toEqual([{ src: 'a', left: 50, width: 50, slot: 0 }]);
+		expect(dragLayout(even, 0, 1)).toEqual([{ src: 'b', left: 0, width: 50, slot: 1 }]);
+		expect(dragLayout(even, 1, 1)).toEqual([{ src: 'a', left: 0, width: 50, slot: 0 }]);
+
+		const third = 100 / 3;
+		const three = ['a', 'b', 'c'].map((src, index) => ({ src, left: index * third, width: third }));
+		const laid = dragLayout(three, 2, 0);
+		expect(laid.map((block) => block.slot)).toEqual([0, 1]);
+		expect(laid[0].left).toBeCloseTo(third);
+		expect(laid[1].left).toBeCloseTo(third * 2);
+
+		const overlapped = [
+			{ src: 'a', left: 0, width: 56.25 },
+			{ src: 'b', left: 43.75, width: 56.25 }
+		];
+		expect(dragLayout(overlapped, 1, 0)).toEqual([{ src: 'a', left: 43.75, width: 56.25, slot: 0 }]);
+		expect(settledLayout(even, 1, 0)).toEqual([
+			{ src: 'b', left: 0, width: 50 },
+			{ src: 'a', left: 50, width: 50 }
+		]);
+		expect(settledLayout(overlapped, 1, 0)).toEqual([
+			{ src: 'b', left: 0, width: 56.25 },
+			{ src: 'a', left: 43.75, width: 56.25 }
+		]);
 	});
 
 	it('reorders a picture and keeps its pin', () => {

@@ -1085,7 +1085,11 @@ that center, so every point on the timeline is a landing place. A drop at
 or left of the first picture's center makes the dropped picture first, and
 the old first picture moves to second. A drop right of the last picture's
 center makes the dropped picture last. This works before a song is chosen,
-while every block has the same width.
+while every block has the same width. While the pointer travels, the picture
+lifts off the strip and follows it, with a shadow so it reads as held. The
+other pictures keep their widths and slide together, leaving a gap the width
+of the held picture at the landing place. The rails stay where they are.
+Releasing the pointer sets the picture into the gap.
 
 A press on a picture selects it when the pointer does not travel, and
 reorders it when the pointer does. A press on the grip in a dissolve

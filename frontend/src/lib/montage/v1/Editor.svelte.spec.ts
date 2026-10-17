@@ -214,11 +214,10 @@ describe('Editor', () => {
 		const timeline = screen.getByRole('group', { name: 'Timeline' });
 		stubTrack();
 		const moving = within(timeline).getByRole('button', { name: '2. b.jpg' });
-		await user.pointer([
-			{ keys: '[MouseLeft>]', target: moving },
-			{ coords: { x: 10, y: 8 } },
-			{ keys: '[/MouseLeft]' }
-		]);
+		fireEvent.pointerDown(moving, { clientX: 150, clientY: 8, button: 0, pointerId: 1 });
+		fireEvent.pointerMove(window, { clientX: 10, clientY: 8, button: 0, pointerId: 1 });
+		fireEvent.pointerUp(window, { clientX: 10, clientY: 8, button: 0, pointerId: 1 });
+		await tick();
 
 		expect(within(timeline).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
 			'1. b.jpg',
@@ -226,6 +225,38 @@ describe('Editor', () => {
 		]);
 		expect(screen.getByText('Unsaved changes')).toBeTruthy();
 		expect(api.plans).toEqual([]);
+	});
+
+	it('lifts a picture and opens a gap while it is dragged', async () => {
+		const user = userEvent.setup();
+		render(Editor, { client: client().client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/b.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+
+		const timeline = screen.getByRole('group', { name: 'Timeline' });
+		stubTrack();
+		const moving = within(timeline).getByRole('button', { name: '2. b.jpg' });
+		fireEvent.pointerDown(moving, { clientX: 150, clientY: 8, button: 0 });
+		fireEvent.pointerMove(window, { clientX: 10, clientY: 8, button: 0 });
+		await waitFor(() => {
+			expect(document.querySelector('[data-lift]')).toBeTruthy();
+		});
+		const held = document.querySelector('[data-lift]') as HTMLElement;
+		expect(held.className).toContain('shadow-');
+		expect(held.textContent).toContain('2');
+		expect(parseFloat(within(timeline).getByRole('button', { name: '1. a.jpg' }).style.left)).toBeCloseTo(50);
+		expect(within(timeline).queryByRole('button', { name: '2. b.jpg' })).toBeNull();
+		fireEvent.pointerUp(window, { clientX: 10, clientY: 8, button: 0 });
+		await tick();
+		expect(document.querySelector('[data-lift]')).toBeNull();
+		expect(within(timeline).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+			'1. b.jpg',
+			'2. a.jpg'
+		]);
 	});
 
 	it('selects a picture when the press does not travel', async () => {
