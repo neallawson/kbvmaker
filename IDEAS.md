@@ -914,7 +914,8 @@ the first four, plus `hold`. The window's names for them:
 | Hold still | `hold` |
 
 The script's `i % 4` is not four presets of a video. It is one video that
-cycles four moves. On screen that cycle is a single Look, not four decisions.
+cycles four moves. Photo film keeps three of them: slow zoom in, pan across,
+and slow zoom out. Drift down stays a choice on a single picture.
 
 A **Look** is a composition preset: a recipe with no photographs in it. It
 carries defaults (join, hold, zoom span, fill, ease), a timing policy, an
@@ -945,7 +946,7 @@ the first screen. The rest sit under More looks.
   slow zoom in and slow zoom out. Load, render, done.
 - **Photo film.** The shell script. `fit-audio`, fade `1.5`, hold `1`, zoom
   span `0.4`, blurred photo, same output size. Assignment cycles slow zoom
-  in, pan across, drift down, slow zoom out.
+  in, pan across, and slow zoom out.
 - **Quick slides.** `fixed-clip` of `5` seconds, dissolve `0.5`, hold `0`,
   zoom span `0.2`, black bars. Every picture is a slow zoom in. Pins are
   cleared, because this Look gives every picture the same length.
@@ -1052,7 +1053,7 @@ picture. It does not rename the file to the Look.
   zoom out.
 - **Photo film.** `fit-audio`, dissolve `1.5`, hold `1`, zoom span `0.4`,
   blurred photo, same output size. Modes cycle slow zoom in, pan across,
-  drift down, slow zoom out.
+  and slow zoom out.
 - **Quick slides.** `fixed-clip` of `5` seconds, dissolve `0.5`, hold `0`,
   zoom span `0.2`, black bars. Every picture is slow zoom in. Pins are
   cleared, because this Look gives every picture the same length.

@@ -74,11 +74,34 @@ describe('Editor', () => {
 
 		expect(screen.getByRole('heading', { level: 1, name: 'kbvmaker - Montage (v1) editor, renderer' })).toBeTruthy();
 		expect(screen.getByRole('heading', { level: 1 }).parentElement?.textContent).not.toContain('Unsaved changes');
-		const buttons = screen.getByRole('button', { name: 'New' }).parentElement?.parentElement;
+		const buttons = screen.getByRole('button', { name: 'New' }).closest('.grid');
 		expect(buttons?.textContent).toContain('Unsaved changes');
 		expect(screen.getByRole('button', { name: 'Classic' }).getAttribute('aria-pressed')).toBe('true');
 		expect(screen.getByText('Each picture shows up here as you add it.')).toBeTruthy();
 		expect(document.querySelectorAll('[data-timeline] .film-rail')).toHaveLength(2);
+	});
+
+	it('uses the window width and wraps a long file name', async () => {
+		const user = userEvent.setup();
+		render(Editor, { client: client().client, host: browser });
+		const main = screen.getByRole('heading', { level: 1 }).closest('main');
+		expect(main?.className).toContain('w-full');
+		expect(main?.className).toContain('p-4');
+		expect(main?.className).not.toContain('max-w-');
+
+		const name = `${'wedding-photo-'.repeat(8)}final.jpg`;
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		const status = screen.getByText('Unsaved changes');
+		expect(status.getAttribute('data-aside')).toBe('');
+		expect(status.className).not.toContain('ml-auto');
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), `/films/${name}`);
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		const row = await screen.findByRole('listitem');
+		const label = within(row).getByRole('button', { name: `1. ${name}` });
+		expect(label.className).toContain('min-w-0');
+		expect(label.querySelector('span')?.className).toContain('break-all');
+		expect(screen.getByText('/films/piece.montage.json').className).toContain('break-all');
 	});
 
 	it('shows a picture on the timeline before a song is chosen', async () => {
@@ -152,6 +175,10 @@ describe('Editor', () => {
 
 		const timeline = await screen.findByRole('group', { name: 'Timeline' });
 		expect(await within(timeline).findByText('0:00')).toBeTruthy();
+		const asides = document.querySelectorAll('[data-aside]');
+		expect(asides).toHaveLength(2);
+		expect(asides[0].parentElement).toBe(asides[1].parentElement);
+		expect(asides[0].parentElement?.className).toContain('max-w-6xl');
 		expect(within(timeline).getByText('0:20')).toBeTruthy();
 		expect(timeline.querySelectorAll('[data-join]')).toHaveLength(1);
 		const score = await within(timeline).findByRole('button', { name: '2. b.jpg' });

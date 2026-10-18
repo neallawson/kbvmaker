@@ -608,55 +608,55 @@
 	<title>{title}</title>
 </svelte:head>
 
-<main class="mx-auto flex max-w-3xl flex-col gap-4 p-6">
+<main class="mx-auto flex w-full min-w-0 flex-col gap-4 p-4 sm:p-6 lg:p-8">
 	<header>
 		<h1 class="text-2xl font-semibold">{title}</h1>
 	</header>
 
 	<fieldset class="flex min-w-0 flex-col gap-4" disabled={working} aria-busy={working}>
-	<div class="flex flex-wrap items-center gap-2">
-		{#if !host.pickSaveMontage}
-			<input
-				class="border-input bg-background h-9 min-w-64 rounded-md border px-3"
-				aria-label="Project file"
-				bind:value={pathDraft}
-			/>
-		{/if}
-		<div class="flex flex-wrap gap-2">
-			<Button onclick={newProjectFile} disabled={working}>New</Button>
-			<Button variant="outline" onclick={() => openProject()} disabled={working}>Open</Button>
-			<Button variant="outline" onclick={save} disabled={working || !doc}>Save</Button>
-		</div>
-		<p class="text-muted-foreground ml-auto text-sm">{dirty ? 'Unsaved changes' : filePath ? 'Saved' : ''}</p>
-	</div>
-	{#if filePath}
-		<p class="text-sm">{filePath}</p>
-	{/if}
-
-	{#if doc}
-		<section class="flex flex-col gap-2">
-			<h2 class="font-medium">Soundtrack</h2>
+	<div class="grid w-full max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 gap-y-4">
+		<div class="flex min-w-0 flex-wrap items-center gap-2">
+			{#if !host.pickSaveMontage}
+				<input
+					class="border-input bg-background h-9 w-96 max-w-full min-w-0 rounded-md border px-3"
+					aria-label="Project file"
+					bind:value={pathDraft}
+				/>
+			{/if}
 			<div class="flex flex-wrap gap-2">
-				{#if !host.pickAudio}
-					<input
-						class="border-input bg-background h-9 min-w-64 rounded-md border px-3"
-						aria-label="Song file"
-						bind:value={songDraft}
-					/>
-				{/if}
-				<Button variant="outline" onclick={() => addSong()}>
-					{doc.audio ? 'Change soundtrack' : 'Add soundtrack'}
-				</Button>
+				<Button onclick={newProjectFile} disabled={working}>New</Button>
+				<Button variant="outline" onclick={() => openProject()} disabled={working}>Open</Button>
+				<Button variant="outline" onclick={save} disabled={working || !doc}>Save</Button>
+			</div>
+		</div>
+		<p class="text-muted-foreground text-sm" data-aside>{dirty ? 'Unsaved changes' : filePath ? 'Saved' : ''}</p>
+		{#if filePath}
+			<p class="col-span-2 min-w-0 text-sm break-all">{filePath}</p>
+		{/if}
+		{#if doc}
+			<div class="col-span-2 flex flex-col gap-2">
+				<h2 class="font-medium">Soundtrack</h2>
+				<div class="flex flex-wrap gap-2">
+					{#if !host.pickAudio}
+						<input
+							class="border-input bg-background h-9 w-96 max-w-full min-w-0 rounded-md border px-3"
+							aria-label="Song file"
+							bind:value={songDraft}
+						/>
+					{/if}
+					<Button variant="outline" onclick={() => addSong()}>
+						{doc.audio ? 'Change soundtrack' : 'Add soundtrack'}
+					</Button>
+				</div>
 			</div>
 			{#if doc.audio}
-				<p class="flex items-baseline justify-between text-sm">
-					<span>{baseName(doc.audio)}</span>
-					{#if songSeconds != null}
-						<span>{songClock(songSeconds)}</span>
-					{/if}
-				</p>
+				<p class="min-w-0 text-sm break-all">{baseName(doc.audio)}</p>
+				<p class="text-sm tabular-nums" data-aside>{songSeconds != null ? songClock(songSeconds) : ''}</p>
 			{/if}
-		</section>
+		{/if}
+	</div>
+
+	{#if doc}
 
 		<section class="flex flex-col gap-2">
 			<h2 class="font-medium">Look</h2>
@@ -681,7 +681,7 @@
 			<div class="flex flex-wrap gap-2">
 				{#if !host.pickImages}
 					<input
-						class="border-input bg-background h-9 min-w-64 rounded-md border px-3"
+						class="border-input bg-background h-9 w-full min-w-0 rounded-md border px-3 sm:w-96"
 						aria-label="Picture file"
 						bind:value={pictureDraft}
 					/>
@@ -779,11 +779,11 @@
 			<ul class="flex flex-col gap-2">
 				{#each doc.slots ?? [] as slot, index (slot.src + index)}
 					<li class="rounded-md border p-3 {selected === index ? 'border-primary' : ''}">
-						<button type="button" class="flex w-full items-center gap-2 text-left" onclick={() => choose(index)}>
+						<button type="button" class="flex w-full min-w-0 items-center gap-2 text-left" onclick={() => choose(index)}>
 							{#if thumbFor(slot.src)}
 								<img alt="" src={thumbFor(slot.src)} class="h-10 w-16 shrink-0 rounded object-cover" />
 							{/if}
-							<span>
+							<span class="min-w-0 break-all">
 								{index + 1}. {baseName(slot.src)}
 								{#if plan?.slots[index]}
 									<span class="text-muted-foreground"> · {secondsLabel(plan.slots[index].clipDur)}s</span>
@@ -859,7 +859,7 @@
 			</Button>
 			<Button onclick={render} disabled={working || !doc.audio || !doc.slots?.length}>Render video</Button>
 			{#if busy}
-				<p role="status" class="text-sm">
+				<p role="status" class="min-w-0 text-sm break-all">
 					{busy}
 					{#if working}
 						<span class="text-muted-foreground"> {clock(elapsed)}</span>

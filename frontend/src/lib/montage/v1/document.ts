@@ -31,7 +31,7 @@ const looks: Record<LookId, Look> = {
 		canvas: { ...canvas, backdrop: { kind: 'blur', blur: 40 } },
 		defaults: { join: { type: 'fade', duration: 1.5 }, hold: 1, zoomSpan: 0.4, ease: 'linear' },
 		timing: { policy: 'fit-audio' },
-		cycle: ['in-center', 'in-left-right', 'in-top-bottom', 'out-center']
+		cycle: ['in-center', 'in-left-right', 'out-center']
 	},
 	'quick-slides': {
 		canvas: { ...canvas, backdrop: black },

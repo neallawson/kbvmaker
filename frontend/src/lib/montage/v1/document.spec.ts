@@ -63,6 +63,11 @@ describe('project edits', () => {
 		expect(file.slots).toEqual([]);
 	});
 
+	it('cycles Photo film through zoom in, pan across, and zoom out', () => {
+		const file = addPictures(applyLook(newProject(), 'photo-film'), ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg'], 'photo-film');
+		expect(file.slots?.map((slot) => slot.mode)).toEqual(['in-center', 'in-left-right', 'out-center', 'in-center']);
+	});
+
 	it('appends pictures in pick order and alternates Classic moves', () => {
 		const file = addPictures(newProject(), ['b.jpg', 'a.jpg'], 'classic');
 		expect(file.slots?.map((slot) => slot.src)).toEqual(['b.jpg', 'a.jpg']);

@@ -83,7 +83,7 @@ A **look** sets the pacing, the dissolve, and a move on every picture. Classic i
 | Look | How time is shared | Between pictures | Behind the photo | Moves |
 | --- | --- | --- | --- | --- |
 | Classic | Pictures share the song | 1s dissolve | Black | Alternates slow zoom in and slow zoom out |
-| Photo film | Pictures share the song | 1.5s dissolve | A blurred copy of the photo | Cycles slow zoom in, pan across, drift down, and slow zoom out |
+| Photo film | Pictures share the song | 1.5s dissolve | A blurred copy of the photo | Cycles slow zoom in, pan across, and slow zoom out |
 | Quick slides | Each picture is 5 seconds | 0.5s dissolve | Black | Slow zoom in on every picture |
 
 Quick slides gives every picture the same five seconds, so a length pinned on one picture is cleared.
