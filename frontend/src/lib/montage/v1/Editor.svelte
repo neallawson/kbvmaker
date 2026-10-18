@@ -72,6 +72,9 @@
 	const thumbHeight = 180;
 	const gripWidth = 28;
 	const dragSlop = 4;
+	const cluster =
+		'grid w-full max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 gap-y-4';
+	const rule = 'border-b border-foreground/20 pb-2';
 
 	const looks: { id: LookId; label: string }[] = [
 		{ id: 'classic', label: 'Classic' },
@@ -609,34 +612,40 @@
 </svelte:head>
 
 <main class="mx-auto flex w-full min-w-0 flex-col gap-4 p-4 sm:p-6 lg:p-8">
-	<header>
-		<h1 class="text-2xl font-semibold">{title}</h1>
-	</header>
-
 	<fieldset class="flex min-w-0 flex-col gap-4" disabled={working} aria-busy={working}>
-	<div class="grid w-full max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 gap-y-4">
-		<div class="flex min-w-0 flex-wrap items-center gap-2">
-			{#if !host.pickSaveMontage}
-				<input
-					class="border-input bg-background h-9 w-96 max-w-full min-w-0 rounded-md border px-3"
-					aria-label="Project file"
-					bind:value={pathDraft}
-				/>
-			{/if}
-			<div class="flex flex-wrap gap-2">
-				<Button onclick={newProjectFile} disabled={working}>New</Button>
-				<Button variant="outline" onclick={() => openProject()} disabled={working}>Open</Button>
-				<Button variant="outline" onclick={save} disabled={working || !doc}>Save</Button>
+		<section class="flex flex-col gap-2 {rule}">
+			<header>
+				<h1 class="text-2xl font-semibold">{title}</h1>
+			</header>
+			<div class={cluster}>
+				<div class="flex min-w-0 flex-wrap items-center gap-2">
+					{#if !host.pickSaveMontage}
+						<input
+							class="border-input bg-background h-9 w-96 max-w-full min-w-0 rounded-md border px-3"
+							aria-label="Project file"
+							bind:value={pathDraft}
+						/>
+					{/if}
+					<div class="flex flex-wrap gap-2">
+						<Button onclick={newProjectFile} disabled={working}>New</Button>
+						<Button variant="outline" onclick={() => openProject()} disabled={working}>Open</Button>
+						<Button variant="outline" onclick={save} disabled={working || !doc}>Save</Button>
+					</div>
+				</div>
+				<p class="text-muted-foreground w-40 text-sm whitespace-nowrap" data-aside>
+					{dirty ? 'Unsaved changes' : filePath ? 'Saved' : ''}
+				</p>
+				{#if filePath}
+					<p class="col-span-2 min-w-0 text-sm break-all">{filePath}</p>
+				{/if}
 			</div>
-		</div>
-		<p class="text-muted-foreground text-sm" data-aside>{dirty ? 'Unsaved changes' : filePath ? 'Saved' : ''}</p>
-		{#if filePath}
-			<p class="col-span-2 min-w-0 text-sm break-all">{filePath}</p>
-		{/if}
-		{#if doc}
-			<div class="col-span-2 flex flex-col gap-2">
-				<h2 class="font-medium">Soundtrack</h2>
-				<div class="flex flex-wrap gap-2">
+		</section>
+
+	{#if doc}
+		<section class="flex flex-col gap-2 {rule}">
+			<h2 class="font-medium">Soundtrack</h2>
+			<div class={cluster}>
+				<div class="col-span-2 flex flex-wrap gap-2">
 					{#if !host.pickAudio}
 						<input
 							class="border-input bg-background h-9 w-96 max-w-full min-w-0 rounded-md border px-3"
@@ -648,17 +657,16 @@
 						{doc.audio ? 'Change soundtrack' : 'Add soundtrack'}
 					</Button>
 				</div>
+				{#if doc.audio}
+					<p class="min-w-0 text-sm break-all">{baseName(doc.audio)}</p>
+					<p class="w-40 text-sm whitespace-nowrap tabular-nums" data-aside>
+						{songSeconds != null ? songClock(songSeconds) : ''}
+					</p>
+				{/if}
 			</div>
-			{#if doc.audio}
-				<p class="min-w-0 text-sm break-all">{baseName(doc.audio)}</p>
-				<p class="text-sm tabular-nums" data-aside>{songSeconds != null ? songClock(songSeconds) : ''}</p>
-			{/if}
-		{/if}
-	</div>
+		</section>
 
-	{#if doc}
-
-		<section class="flex flex-col gap-2">
+		<section class="flex flex-col gap-2 {rule}">
 			<h2 class="font-medium">Look</h2>
 			<div class="flex flex-wrap gap-2">
 				{#each looks as item (item.id)}
@@ -676,7 +684,7 @@
 			</div>
 		</section>
 
-		<section class="flex flex-col gap-2">
+		<section class="flex flex-col gap-2 {rule}">
 			<h2 class="font-medium">Pictures</h2>
 			<div class="flex flex-wrap gap-2">
 				{#if !host.pickImages}
@@ -853,20 +861,23 @@
 			</ul>
 		</section>
 
-		<div class="flex flex-wrap items-center gap-2">
-			<Button variant="outline" onclick={exportScript} disabled={working || !doc.audio || !doc.slots?.length}>
-				Export shell script
-			</Button>
-			<Button onclick={render} disabled={working || !doc.audio || !doc.slots?.length}>Render video</Button>
-			{#if busy}
-				<p role="status" class="min-w-0 text-sm break-all">
-					{busy}
-					{#if working}
-						<span class="text-muted-foreground"> {clock(elapsed)}</span>
-					{/if}
-				</p>
-			{/if}
-		</div>
+		<section class="flex flex-col gap-2">
+			<h2 class="font-medium">Render</h2>
+			<div class="flex flex-wrap items-center gap-2">
+				<Button variant="outline" onclick={exportScript} disabled={working || !doc.audio || !doc.slots?.length}>
+					Export shell script
+				</Button>
+				<Button onclick={render} disabled={working || !doc.audio || !doc.slots?.length}>Render video</Button>
+				{#if busy}
+					<p role="status" class="min-w-0 text-sm break-all">
+						{busy}
+						{#if working}
+							<span class="text-muted-foreground"> {clock(elapsed)}</span>
+						{/if}
+					</p>
+				{/if}
+			</div>
+		</section>
 	{/if}
 	</fieldset>
 	{#if error && errorSlot === 0}

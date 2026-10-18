@@ -77,6 +77,14 @@ describe('Editor', () => {
 		const buttons = screen.getByRole('button', { name: 'New' }).closest('.grid');
 		expect(buttons?.textContent).toContain('Unsaved changes');
 		expect(screen.getByRole('button', { name: 'Classic' }).getAttribute('aria-pressed')).toBe('true');
+		const title = screen.getByRole('heading', { level: 1 });
+		for (const heading of [title, screen.getByRole('heading', { name: 'Soundtrack' }), screen.getByRole('heading', { name: 'Look' }), screen.getByRole('heading', { name: 'Pictures' }), screen.getByRole('heading', { name: 'Render' })]) {
+			expect(heading.className).not.toContain('border-b');
+		}
+		expect(title.closest('section')?.className).toContain('border-b');
+		expect(screen.getByRole('heading', { name: 'Pictures' }).closest('section')?.className).toContain('border-b');
+		expect(screen.getByRole('heading', { name: 'Render' }).closest('section')?.className).not.toContain('border-b');
+		expect(screen.getByText('Timeline').className).not.toContain('border-b');
 		expect(screen.getByText('Each picture shows up here as you add it.')).toBeTruthy();
 		expect(document.querySelectorAll('[data-timeline] .film-rail')).toHaveLength(2);
 	});
@@ -177,7 +185,7 @@ describe('Editor', () => {
 		expect(await within(timeline).findByText('0:00')).toBeTruthy();
 		const asides = document.querySelectorAll('[data-aside]');
 		expect(asides).toHaveLength(2);
-		expect(asides[0].parentElement).toBe(asides[1].parentElement);
+		expect(asides[0].parentElement?.className).toBe(asides[1].parentElement?.className);
 		expect(asides[0].parentElement?.className).toContain('max-w-6xl');
 		expect(within(timeline).getByText('0:20')).toBeTruthy();
 		expect(timeline.querySelectorAll('[data-join]')).toHaveLength(1);
