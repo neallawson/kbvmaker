@@ -162,7 +162,7 @@ describe('Editor', () => {
 		await user.type(length, '40');
 		await user.tab();
 
-		await screen.findByRole('button', { name: 'Share the rest' });
+		await screen.findByRole('button', { name: 'Remove custom time' });
 		const last = api.plans.at(-1);
 		expect(last?.slots?.[1].dur).toBe(40);
 		expect(last?.slots?.[0].dur).toBeUndefined();
@@ -297,7 +297,7 @@ describe('Editor', () => {
 		stubTrack();
 		const grip = within(timeline).getByRole('button', { name: 'Change the lengths beside pictures 1 and 2' });
 		expect(grip.style.width).toBe('28px');
-		expect(grip.querySelector('span')?.className).toContain('w-0.5');
+		expect(timeline.querySelector('[data-grip-mark]')?.className).toContain('w-0.5');
 		fireEvent.pointerDown(grip, { clientX: 0, clientY: 8, button: 0 });
 		fireEvent.pointerMove(window, { clientX: 20, clientY: 8, button: 0 });
 		await waitFor(() => {
@@ -318,7 +318,37 @@ describe('Editor', () => {
 		);
 		expect(screen.getByText('Unsaved changes')).toBeTruthy();
 		expect(saved).toBe(false);
-		expect(screen.getByRole('button', { name: 'Share the rest' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Remove custom time' })).toBeTruthy();
+	});
+
+	it('leaves the center of a short picture free of the grips', async () => {
+		const user = userEvent.setup();
+		render(Editor, {
+			client: client({
+				montage: 1,
+				audio: 'song.mp3',
+				timing: { policy: 'fit-audio' },
+				slots: [
+					{ src: 'a.jpg', mode: 'in-center', dur: 10 },
+					{ src: 'b.jpg', mode: 'out-center', dur: 2 },
+					{ src: 'c.jpg', mode: 'in-center', dur: 10 }
+				]
+			}).client,
+			host: browser
+		});
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+		const timeline = await screen.findByRole('group', { name: 'Timeline' });
+		await within(timeline).findByText('0:00');
+		stubTrack();
+		window.dispatchEvent(new Event('resize'));
+		await tick();
+		const picture = within(timeline).getByRole('button', { name: '2. b.jpg' });
+		const pictureLeft = (parseFloat(picture.style.left) / 100) * 200;
+		const grip = within(timeline).getByRole('button', { name: 'Change the lengths beside pictures 1 and 2' });
+		expect(grip.style.left.endsWith('px')).toBe(true);
+		const gripRight = parseFloat(grip.style.left) + parseFloat(grip.style.width);
+		expect(gripRight).toBeLessThanOrEqual(pictureLeft + 0.01);
 	});
 });
 

@@ -5,6 +5,7 @@ import {
 	dragLayout,
 	settledLayout,
 	dropIndex,
+	gripHit,
 	moveSlot,
 	newProject,
 	relativize,
@@ -104,6 +105,26 @@ describe('project edits', () => {
 		expect(shuffleSlots(file, random).slots?.map((slot) => slot.src)).toEqual(['b.jpg', 'a.jpg', 'c.jpg']);
 		const moves = shuffleMoves(file, () => 0.99).slots?.map((slot) => slot.mode);
 		expect(moves).toEqual(['hold', 'hold', 'hold']);
+	});
+
+	it('keeps a short picture clickable between its grips', () => {
+		const wide = { left: 0, width: 50 };
+		const next = { left: 45, width: 50 };
+		const centered = gripHit(wide, next, 47.5, 400);
+		expect(centered).toEqual({ left: 176, width: 28 });
+
+		const track = 720;
+		const film = 200;
+		const long = { left: 0, width: (25 / film) * 100 };
+		const short = { left: ((25 - 1) / film) * 100, width: (7 / film) * 100 };
+		const join = short.left + 0.5 * (1 / film) * 100;
+		const hit = gripHit(long, short, join, track);
+		expect(hit).not.toBeNull();
+		const shortStart = (short.left / 100) * track;
+		const shortEnd = shortStart + (short.width / 100) * track;
+		const reservedStart = shortStart + (shortEnd - shortStart - 24) / 2;
+		expect(hit!.left + hit!.width).toBeLessThanOrEqual(reservedStart + 0.01);
+		expect(gripHit({ left: 0, width: 2 }, { left: 1, width: 2 }, 1.5, 80)).toBeNull();
 	});
 
 	it('drops a picture by the centers on the timeline', () => {

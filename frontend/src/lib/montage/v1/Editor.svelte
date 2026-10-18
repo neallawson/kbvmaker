@@ -10,6 +10,7 @@
 		blocksFromLengths,
 		dragLayout,
 		dropIndex,
+		gripHit,
 		settledLayout,
 		moveSlot,
 		newProject,
@@ -55,6 +56,7 @@
 	let lengthDraft = $state<string | null>(null);
 	let thumbs = $state<Record<string, string>>({});
 	let trackEl = $state<HTMLDivElement | null>(null);
+	let trackWidth = $state(0);
 	let preview = $state<{ lengths: number[]; dissolve: number } | null>(null);
 	/** gripCommit keeps the drag on screen until the plan draws those same blocks. */
 	let gripCommit = $state(false);
@@ -433,6 +435,31 @@
 	});
 	let joins = $derived(scoreJoins(placed));
 
+	$effect(() => {
+		const el = trackEl;
+		const layout = placed.map((block) => `${block.left}:${block.width}`).join('|');
+		if (!el || !layout) {
+			return;
+		}
+		const read = () => {
+			const width = el.getBoundingClientRect().width;
+			if (width > 0) {
+				trackWidth = width;
+			}
+		};
+		read();
+		let observer: ResizeObserver | undefined;
+		if (typeof ResizeObserver !== 'undefined') {
+			observer = new ResizeObserver(read);
+			observer.observe(el);
+		}
+		window.addEventListener('resize', read);
+		return () => {
+			observer?.disconnect();
+			window.removeEventListener('resize', read);
+		};
+	});
+
 	function policyOf(file: MontageFile): string {
 		return file.timing?.policy ?? 'fit-audio';
 	}
@@ -704,16 +731,21 @@
 							data-join
 						></div>
 						{#if !lift}
-							<button
-								type="button"
-								class="absolute top-2.5 bottom-2.5 z-30 cursor-ew-resize"
-								style="left: {join.left + join.width / 2}%; width: {gripWidth}px; transform: translateX(-50%)"
-								aria-label="Change the lengths beside pictures {index + 1} and {index + 2}"
-								data-grip
-								onpointerdown={(event) => startGrip(event, index)}
-							>
-								<span class="pointer-events-none absolute inset-y-3 left-1/2 w-0.5 -translate-x-1/2 rounded bg-white"></span>
-							</button>
+							{@const center = join.left + join.width / 2}
+							{@const hit = trackWidth > 0 ? gripHit(placed[index], placed[index + 1], center, trackWidth, gripWidth) : null}
+							<div class="pointer-events-none absolute top-2.5 bottom-2.5 z-30" style="left: {center}%; width: 0">
+								<span data-grip-mark class="pointer-events-none absolute inset-y-3 left-1/2 w-0.5 -translate-x-1/2 rounded bg-white"></span>
+							</div>
+							{#if hit == null || hit.width > 0}
+								<button
+									type="button"
+									class="absolute top-2.5 bottom-2.5 z-30 cursor-ew-resize"
+									style={hit ? `left: ${hit.left}px; width: ${hit.width}px` : `left: ${center}%; width: ${gripWidth}px; transform: translateX(-50%)`}
+									aria-label="Change the lengths beside pictures {index + 1} and {index + 2}"
+									data-grip
+									onpointerdown={(event) => startGrip(event, index)}
+								></button>
+							{/if}
 						{/if}
 					{/each}
 				</div>
@@ -793,7 +825,7 @@
 								{/if}
 								<div class="flex flex-wrap gap-2">
 									{#if policyOf(doc) === 'fit-audio' && slot.dur != null}
-										<Button variant="outline" onclick={() => edit(setDur(doc!, index, null))}>Share the rest</Button>
+										<Button variant="outline" onclick={() => edit(setDur(doc!, index, null))}>Remove custom time</Button>
 									{/if}
 									<Button variant="outline" onclick={() => edit(moveSlot(doc!, index, -1))} disabled={index === 0}>Move up</Button>
 									<Button

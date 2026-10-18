@@ -999,8 +999,8 @@ pictures. The number the list shows for an unpinned picture is the resolved
 clip length, and it is not written into the file.
 
 Typing a length stores `dur` on that slot only. The other unpinned pictures
-divide what remains, overlaps included. Clearing the box removes `dur` and
-puts the picture back in the share. A project with more than one picture
+divide what remains, overlaps included. Clearing the box, or Remove custom
+time, removes `dur` and puts the picture back in the share. A project with more than one picture
 keeps at least one picture unpinned. A pin has to leave every remaining
 picture longer than the dissolve. When it does not, the plan error names
 that picture.
@@ -1096,7 +1096,9 @@ reorders it when the pointer does. A press on the grip in a dissolve
 changes the two lengths. The grip is a short vertical mark in the center
 of the darker band, and the pointer becomes a left-right arrow over it.
 Its grab area is wide enough to take a press comfortably. The mark may be
-drawn narrower than that area.
+drawn narrower than that area. The grab area stays out of the center of
+each picture, so a short picture can still be selected when the two grips
+would otherwise cover it.
 The rest of the band still shows the dissolve and still belongs to the
 pictures underneath, so selecting or reordering a picture stays possible
 there. Drag the grip sideways and time moves from one neighbor to the
@@ -1111,7 +1113,7 @@ picture keeps the length it had. One picture in the file still has to stay
 unpinned and absorb the song. When one of the two is that picture, only the
 other is pinned. With only two pictures, one pin is enough. The drag stops
 when either picture would become as short as the dissolve. Clearing the
-length box still puts that picture back in the share.
+length box, or Remove custom time, still puts that picture back in the share.
 
 Quick slides is `fixed-clip`. Every picture has one length, and the film is
 not the song. The first divider drag leaves that policy: it writes each

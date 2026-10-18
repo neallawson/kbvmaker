@@ -422,6 +422,51 @@ export interface ScoreJoin {
 	width: number;
 }
 
+/**
+ * gripHit is the grab area for the divider between two pictures.
+ * Each picture keeps a clickable center, so a short picture is not covered by both grips.
+ * Lengths are percentages of the track. The result is in pixels. Null means there is no room to grab.
+ */
+export function gripHit(
+	left: { left: number; width: number },
+	right: { left: number; width: number },
+	joinCenter: number,
+	trackWidth: number,
+	wanted = 28,
+	minSelect = 24
+): { left: number; width: number } | null {
+	if (trackWidth <= 0) {
+		return null;
+	}
+	const px = (percent: number) => (percent / 100) * trackWidth;
+	const leftBox = selectBand(px(left.left), px(left.left + left.width), minSelect);
+	const rightBox = selectBand(px(right.left), px(right.left + right.width), minSelect);
+	const corridorStart = leftBox.reservedEnd;
+	const corridorEnd = rightBox.reservedStart;
+	const room = corridorEnd - corridorStart;
+	if (room < 8) {
+		return null;
+	}
+	const width = Math.min(wanted, room);
+	let hitLeft = px(joinCenter) - width / 2;
+	if (hitLeft < corridorStart) {
+		hitLeft = corridorStart;
+	}
+	if (hitLeft + width > corridorEnd) {
+		hitLeft = corridorEnd - width;
+	}
+	return { left: hitLeft, width };
+}
+
+function selectBand(start: number, end: number, minSelect: number): { reservedStart: number; reservedEnd: number } {
+	const width = end - start;
+	if (width <= minSelect) {
+		return { reservedStart: start, reservedEnd: end };
+	}
+	const pad = (width - minSelect) / 2;
+	return { reservedStart: start + pad, reservedEnd: end - pad };
+}
+
 /** scoreJoins is the overlap of neighboring pictures: the dissolve on the timeline. */
 export function scoreJoins(blocks: ScoreBlock[]): ScoreJoin[] {
 	const joins: ScoreJoin[] = [];
