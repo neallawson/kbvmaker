@@ -3,7 +3,9 @@ package plan
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 
 	"kbvmaker/v1/check"
 	"kbvmaker/v1/clock"
@@ -28,17 +30,25 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 		return nil, err
 	}
 	audio := doc.ResolvePath(d.Dir, d.Audio)
+	var gaps []mediaGap
 	if err := exists(audio); err != nil {
-		return nil, rule.E(0, "missing-media", "audio %s", d.Audio)
+		gaps = append(gaps, mediaGap{msg: fmt.Sprintf("Missing soundtrack: %s", d.Audio)})
 	}
-	song, err := probe.Duration(ctx, audio)
-	if err != nil {
-		return nil, rule.E(0, "missing-media", "audio %s: %v", d.Audio, err)
-	}
-	if song <= 0 {
-		return nil, rule.E(0, "bad-number", "song duration %v", song)
+	song := 0.0
+	var err error
+	if len(gaps) == 0 {
+		song, err = probe.Duration(ctx, audio)
+		if err != nil {
+			return nil, rule.E(0, "missing-media", "Cannot read soundtrack: %s", d.Audio)
+		}
+		if song <= 0 {
+			return nil, rule.E(0, "bad-number", "song duration %v", song)
+		}
 	}
 	slots := d.Slots
+	if len(slots) == 0 && len(gaps) > 0 {
+		return nil, reportMissing(gaps)
+	}
 	if len(slots) == 0 {
 		slots, err = schedule.Generate(d, song)
 		if err != nil {
@@ -52,6 +62,25 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 		if err := checkDoc.Validate(); err != nil {
 			return nil, err
 		}
+	}
+	for i, s := range slots {
+		path := doc.ResolvePath(d.Dir, s.Src)
+		if err := exists(path); err != nil {
+			gaps = append(gaps, mediaGap{slot: i + 1, msg: fmt.Sprintf("Missing picture %d: %s", i+1, s.Src)})
+		}
+		bars := d.Canvas.Backdrop
+		if s.Backdrop != nil {
+			bars = *s.Backdrop
+		}
+		if bars.Kind == "image" {
+			back := doc.ResolvePath(d.Dir, bars.Src)
+			if err := exists(back); err != nil {
+				gaps = append(gaps, mediaGap{slot: i + 1, msg: fmt.Sprintf("Missing backdrop for picture %d: %s", i+1, bars.Src)})
+			}
+		}
+	}
+	if len(gaps) > 0 {
+		return nil, reportMissing(gaps)
 	}
 	windows, videoDur, err := timing.Resolve(d, slots, song)
 	if err != nil {
@@ -83,9 +112,6 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 	for i, s := range slots {
 		w := windows[i]
 		path := doc.ResolvePath(d.Dir, s.Src)
-		if err := exists(path); err != nil {
-			return nil, rule.E(i+1, "missing-media", "image %s", s.Src)
-		}
 		info, ok := images[path]
 		if !ok {
 			info, err = probe.Image(ctx, path)
@@ -119,12 +145,6 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 		bars := d.Canvas.Backdrop
 		if s.Backdrop != nil {
 			bars = *s.Backdrop
-		}
-		if bars.Kind == "image" {
-			back := doc.ResolvePath(d.Dir, bars.Src)
-			if err := exists(back); err != nil {
-				return nil, rule.E(i+1, "missing-media", "backdrop %s", bars.Src)
-			}
 		}
 		p.Slots = append(p.Slots, model.Slot{
 			Index: i + 1, Src: s.Src, Mode: mode, BasedOn: basedOn, Family: family,
@@ -193,4 +213,23 @@ func requireFilters(ctx context.Context, probe media.Probe) error {
 func exists(path string) error {
 	_, err := os.Stat(path)
 	return err
+}
+
+// mediaGap is one soundtrack, picture, or backdrop that is not on disk.
+type mediaGap struct {
+	slot int
+	msg  string
+}
+
+// reportMissing returns every gap. One gap keeps that picture's slot. Several gaps are one document error so the list stays together.
+func reportMissing(gaps []mediaGap) error {
+	slot := 0
+	if len(gaps) == 1 {
+		slot = gaps[0].slot
+	}
+	msgs := make([]string, len(gaps))
+	for i, gap := range gaps {
+		msgs[i] = gap.msg
+	}
+	return rule.E(slot, "missing-media", "%s", strings.Join(msgs, "\n"))
 }

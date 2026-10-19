@@ -47,6 +47,8 @@
 	let plan = $state<Plan | null>(null);
 	let error = $state('');
 	let errorSlot = $state(0);
+	/** errorKind is plan while a plan failure is showing. A later plan may clear that, and leaves a render or save failure alone. */
+	let errorKind = $state<'plan' | 'action' | ''>('');
 	let busy = $state('');
 	let working = $state(false);
 	let elapsed = $state(0);
@@ -115,8 +117,9 @@
 				if (next.song != null) {
 					songSeconds = next.song;
 				}
-				error = '';
-				errorSlot = 0;
+				if (errorKind === 'plan') {
+					clearError();
+				}
 			})
 			.catch((err: unknown) => {
 				if (!live) {
@@ -125,10 +128,9 @@
 				plan = null;
 				reorderHold = null;
 				if (err instanceof RuleError) {
-					error = err.message;
-					errorSlot = err.slot;
+					showError(err.message, err.slot, 'plan');
 				} else {
-					error = 'Could not read the plan';
+					showError('Could not read the plan', 0, 'plan');
 				}
 			});
 		return () => {
@@ -169,6 +171,18 @@
 		return thumbs[mediaPath(projectDir(filePath), src)] ?? '';
 	}
 
+	function showError(message: string, slot = 0, kind: 'plan' | 'action' = 'action') {
+		error = message;
+		errorSlot = slot;
+		errorKind = kind;
+	}
+
+	function clearError() {
+		error = '';
+		errorSlot = 0;
+		errorKind = '';
+	}
+
 	function edit(next: MontageFile, holdPreview = false) {
 		doc = next;
 		dirty = true;
@@ -186,7 +200,7 @@
 		look = 'classic';
 		selected = 0;
 		dirty = true;
-		error = '';
+		clearError();
 		plan = null;
 		reorderHold = null;
 		lift = null;
@@ -213,14 +227,14 @@
 			look = null;
 			selected = 0;
 			dirty = false;
-			error = '';
+			clearError();
 			lengthDraft = null;
 			songSeconds = null;
 			if (doc.audio) {
 				void measureSong(doc.audio);
 			}
 		} catch (err) {
-			error = err instanceof RuleError ? err.message : 'Could not open the project';
+			showError(err instanceof RuleError ? err.message : 'Could not open the project');
 		}
 	}
 
@@ -240,11 +254,10 @@
 			await client.save(filePath, stored);
 			doc = stored;
 			dirty = false;
-			error = '';
+			clearError();
 			return true;
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Could not save the project';
-			errorSlot = 0;
+			showError(err instanceof Error ? err.message : 'Could not save the project');
 			return false;
 		}
 	}
@@ -255,7 +268,7 @@
 			songSeconds = info.seconds;
 		} catch (err) {
 			songSeconds = null;
-			error = err instanceof RuleError ? err.message : 'Could not read the song';
+			showError(err instanceof RuleError ? err.message : 'Could not read the song');
 			errorSlot = 0;
 		}
 	}
@@ -302,8 +315,7 @@
 		}
 		const n = Number(text);
 		if (!Number.isFinite(n) || n <= 0) {
-			error = 'Enter a length in seconds';
-			errorSlot = selected + 1;
+			showError('Enter a length in seconds', selected + 1);
 			return;
 		}
 		const resolved = plan?.slots[selected]?.clipDur;
@@ -328,7 +340,7 @@
 	}
 
 	async function exportScript() {
-		if (!doc) {
+		if (!doc || !plan) {
 			return;
 		}
 		const dest = host.pickSaveScript ? await host.pickSaveScript() : '';
@@ -337,7 +349,7 @@
 		}
 		const target = dest || `${projectDir(filePath)}/render.sh`;
 		busy = 'Writing the shell script…';
-		error = '';
+		clearError();
 		const stop = startWork();
 		try {
 			if (dirty || !filePath) {
@@ -350,18 +362,17 @@
 			busy = `Wrote ${baseName(target)}`;
 		} catch (err) {
 			busy = '';
-			error = err instanceof Error ? err.message : 'Could not write the shell script';
+			showError(err instanceof Error ? err.message : 'Could not write the shell script');
 		} finally {
 			stop();
 		}
 	}
 
 	async function render() {
-		if (!doc) {
+		if (!doc || !plan) {
 			return;
 		}
-		error = '';
-		errorSlot = 0;
+		clearError();
 		try {
 			const dest = host.pickSaveVideo ? await host.pickSaveVideo() : '';
 			if (host.pickSaveVideo && !dest) {
@@ -386,7 +397,7 @@
 			busy = `Wrote ${baseName(video)} in ${clock(elapsed)}`;
 		} catch (err) {
 			busy = '';
-			error = err instanceof Error ? err.message : 'Could not render the video';
+			showError(err instanceof Error ? err.message : 'Could not render the video');
 		}
 	}
 
@@ -799,7 +810,7 @@
 							</span>
 						</button>
 						{#if error && errorSlot === index + 1}
-							<p role="alert">{error}</p>
+							<p class="text-destructive text-sm">{error}</p>
 						{/if}
 						{#if selected === index}
 							<div class="mt-3 flex flex-col gap-2">
@@ -863,11 +874,14 @@
 
 		<section class="flex flex-col gap-2">
 			<h2 class="font-medium">Render</h2>
+			{#if error}
+				<p role="alert" class="text-destructive text-sm whitespace-pre-line">{error}</p>
+			{/if}
 			<div class="flex flex-wrap items-center gap-2">
-				<Button variant="outline" onclick={exportScript} disabled={working || !doc.audio || !doc.slots?.length}>
+				<Button variant="outline" onclick={exportScript} disabled={working || !plan}>
 					Export shell script
 				</Button>
-				<Button onclick={render} disabled={working || !doc.audio || !doc.slots?.length}>Render video</Button>
+				<Button onclick={render} disabled={working || !plan}>Render video</Button>
 				{#if busy}
 					<p role="status" class="min-w-0 text-sm break-all">
 						{busy}
@@ -880,8 +894,8 @@
 		</section>
 	{/if}
 	</fieldset>
-	{#if error && errorSlot === 0}
-		<p role="alert">{error}</p>
+	{#if error && !doc}
+		<p role="alert" class="text-destructive text-sm whitespace-pre-line">{error}</p>
 	{/if}
 </main>
 

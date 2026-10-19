@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { tick } from 'svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { Client, MontageFile } from './client';
+import { RuleError, type Client, type MontageFile } from './client';
 import Editor from './Editor.svelte';
 import type { Host } from '#lib/platform/host';
 
@@ -220,7 +220,9 @@ describe('Editor', () => {
 		};
 		render(Editor, { client: api.client, host });
 		await user.click(screen.getByRole('button', { name: 'Open' }));
-		await user.click(await screen.findByRole('button', { name: 'Render video' }));
+		const renderVideo = await screen.findByRole('button', { name: 'Render video' });
+		await waitFor(() => expect((renderVideo as HTMLButtonElement).disabled).toBe(false));
+		await user.click(renderVideo);
 
 		expect((await screen.findByRole('status')).textContent).toContain('Rendering…');
 		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).matches(':disabled')).toBe(
@@ -233,6 +235,112 @@ describe('Editor', () => {
 		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).matches(':disabled')).toBe(
 			false
 		);
+	});
+
+	it('keeps a render failure on screen after the plan refreshes', async () => {
+		const user = userEvent.setup();
+		const api = client({
+			montage: 1,
+			audio: 'song.mp3',
+			timing: { policy: 'fit-audio' },
+			slots: [{ src: 'a.jpg', mode: 'in-center' }]
+		});
+		const pending: Array<() => void> = [];
+		let holdPlans = false;
+		const plan = api.client.planBody.bind(api.client);
+		api.client.planBody = (body, dir) => {
+			const run = () => plan(body, dir);
+			if (!holdPlans) {
+				return run();
+			}
+			return new Promise((resolve) => {
+				pending.push(() => {
+					void run().then(resolve);
+				});
+			});
+		};
+		api.client.render = async () => {
+			throw new RuleError(0, 'render', 'clip: ffmpeg failed');
+		};
+		const host: Host = {
+			name: 'window',
+			pickMontage: async () => '/films/piece.montage.json',
+			pickSaveVideo: async () => '/films/out.mp4'
+		};
+		render(Editor, { client: api.client, host });
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+		const renderVideo = await screen.findByRole('button', { name: 'Render video' });
+		await waitFor(() => expect((renderVideo as HTMLButtonElement).disabled).toBe(false));
+		holdPlans = true;
+		await user.click(renderVideo);
+
+		expect((await screen.findByRole('alert')).textContent).toContain('ffmpeg failed');
+		for (const release of pending) {
+			release();
+		}
+		await tick();
+		expect(screen.getByRole('alert').textContent).toContain('ffmpeg failed');
+	});
+
+	it('does not start a render when the soundtrack is missing', async () => {
+		const user = userEvent.setup();
+		const api = client({
+			montage: 1,
+			audio: 'song.mp3',
+			timing: { policy: 'fit-audio' },
+			slots: [{ src: 'a.jpg', mode: 'in-center' }]
+		});
+		api.client.planBody = async () => {
+			throw new RuleError(0, 'missing-media', 'audio song.mp3');
+		};
+		let asked = false;
+		const host: Host = {
+			name: 'window',
+			pickMontage: async () => '/films/piece.montage.json',
+			pickSaveVideo: async () => {
+				asked = true;
+				return '/films/out.mp4';
+			}
+		};
+		render(Editor, { client: api.client, host });
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+
+		expect((await screen.findByRole('alert')).textContent).toContain('audio song.mp3');
+		const renderVideo = screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement;
+		const exportScript = screen.getByRole('button', { name: 'Export shell script' }) as HTMLButtonElement;
+		expect(renderVideo.disabled).toBe(true);
+		expect(exportScript.disabled).toBe(true);
+		await user.click(renderVideo);
+		expect(asked).toBe(false);
+	});
+
+	it('reports every missing picture when a montage is opened', async () => {
+		const user = userEvent.setup();
+		const api = client({
+			montage: 1,
+			audio: 'song.mp3',
+			timing: { policy: 'fit-audio' },
+			slots: [
+				{ src: 'a.jpg', mode: 'in-center' },
+				{ src: 'b.jpg', mode: 'out-center' },
+				{ src: 'c.jpg', mode: 'in-center' }
+			]
+		});
+		api.client.planBody = async () => {
+			throw new RuleError(0, 'missing-media', 'Missing picture 2: b.jpg\nMissing picture 3: c.jpg');
+		};
+		const host: Host = {
+			name: 'window',
+			pickMontage: async () => '/films/piece.montage.json'
+		};
+		render(Editor, { client: api.client, host });
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+
+		const alert = await screen.findByRole('alert');
+		expect(alert.textContent).toContain('Missing picture 2: b.jpg');
+		expect(alert.textContent).toContain('Missing picture 3: c.jpg');
+		expect(screen.getByRole('heading', { name: 'Render' }).parentElement?.contains(alert)).toBe(true);
+		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).disabled).toBe(true);
 	});
 
 	it('drops a picture into a new place on the timeline', async () => {
