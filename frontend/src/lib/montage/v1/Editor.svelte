@@ -655,6 +655,41 @@
 	}
 </script>
 
+{#snippet pictureIcon(name: 'up' | 'down' | 'replace' | 'remove')}
+	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		{#if name === 'up'}
+			<path d="m5 12 7-7 7 7" />
+			<path d="M12 19V5" />
+		{:else if name === 'down'}
+			<path d="M12 5v14" />
+			<path d="m19 12-7 7-7-7" />
+		{:else if name === 'replace'}
+			<path d="M8 3 4 7l4 4" />
+			<path d="M4 7h16" />
+			<path d="m16 21 4-4-4-4" />
+			<path d="M20 17H4" />
+		{:else}
+			<path d="M10 11v6" />
+			<path d="M14 11v6" />
+			<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+			<path d="M3 6h18" />
+			<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+		{/if}
+	</svg>
+{/snippet}
+
+{#snippet pictureAction(label: string, onclick: () => void, disabled: boolean, icon: 'up' | 'down' | 'replace' | 'remove')}
+	<span class="group relative inline-flex">
+		<Button variant="outline" size="icon" aria-label={label} {onclick} {disabled}>
+			{@render pictureIcon(icon)}
+		</Button>
+		<span
+			role="tooltip"
+			class="bg-foreground text-background pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 rounded px-2 py-1 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+		>{label}</span>
+	</span>
+{/snippet}
+
 <svelte:head>
 	<title>{title}</title>
 </svelte:head>
@@ -880,28 +915,27 @@
 								{:else if policyOf(doc) === 'fit-audio' && (doc.slots?.length ?? 0) < 2}
 									<p class="text-muted-foreground text-sm">This picture runs for the whole song.</p>
 								{/if}
-								<div class="flex flex-wrap gap-2">
+								<div class="flex flex-wrap items-center gap-2">
 									{#if policyOf(doc) === 'fit-audio' && slot.dur != null}
 										<Button variant="outline" onclick={() => edit(setDur(doc!, index, null))}>Remove custom time</Button>
 									{/if}
-									<Button variant="outline" onclick={() => edit(moveSlot(doc!, index, -1))} disabled={index === 0}>Move up</Button>
-									<Button
-										variant="outline"
-										onclick={() => edit(moveSlot(doc!, index, 1))}
-										disabled={index === (doc.slots?.length ?? 1) - 1}
-									>
-										Move down
-									</Button>
-									<Button variant="outline" onclick={replacePicture}>Replace</Button>
-									<Button
-										variant="outline"
-										onclick={() => {
+									{@render pictureAction('Move up', () => edit(moveSlot(doc!, index, -1)), index === 0, 'up')}
+									{@render pictureAction(
+										'Move down',
+										() => edit(moveSlot(doc!, index, 1)),
+										index === (doc.slots?.length ?? 1) - 1,
+										'down'
+									)}
+									{@render pictureAction('Replace', replacePicture, false, 'replace')}
+									{@render pictureAction(
+										'Remove',
+										() => {
 											edit(removeSlot(doc!, index));
 											selected = Math.max(0, index - 1);
-										}}
-									>
-										Remove
-									</Button>
+										},
+										false,
+										'remove'
+									)}
 								</div>
 							</div>
 						{/if}

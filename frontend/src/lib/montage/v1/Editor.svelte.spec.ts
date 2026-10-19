@@ -198,6 +198,13 @@ describe('Editor', () => {
 		await user.tab();
 
 		await screen.findByRole('button', { name: 'Remove custom time' });
+		for (const label of ['Move up', 'Move down', 'Replace', 'Remove']) {
+			const button = screen.getByRole('button', { name: label });
+			expect(button.querySelector('svg')).toBeTruthy();
+			expect(button.textContent?.trim()).toBe('');
+			expect(button.parentElement?.querySelector('[role="tooltip"]')?.textContent).toBe(label);
+		}
+		expect((screen.getByRole('button', { name: 'Move down' }) as HTMLButtonElement).disabled).toBe(true);
 		const last = api.plans.at(-1);
 		expect(last?.slots?.[1].dur).toBe(40);
 		expect(last?.slots?.[0].dur).toBeUndefined();
