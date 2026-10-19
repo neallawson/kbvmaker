@@ -68,6 +68,9 @@
 	let reorderHold = $state<ReturnType<typeof settledLayout> | null>(null);
 	let dragArmed = $state(false);
 	let swallowClick = false;
+	/** scan bumps when the soundtrack and pictures should be read from disk again. */
+	let scan = $state(0);
+	let thumbGen = $state(0);
 
 	const title = 'kbvmaker - Montage (v1) editor, renderer';
 	const thumbWidth = 320;
@@ -87,6 +90,7 @@
 	$effect(() => {
 		const current = doc;
 		const dir = projectDir(filePath);
+		void scan;
 		if (!current?.audio || !current.slots?.length) {
 			plan = null;
 			return;
@@ -141,6 +145,7 @@
 	const thumbInflight = new Set<string>();
 
 	$effect(() => {
+		const generation = thumbGen;
 		const dir = projectDir(filePath);
 		const paths = (doc?.slots ?? []).map((slot) => mediaPath(dir, slot.src));
 		const pending = untrack(() => {
@@ -158,11 +163,16 @@
 			void client
 				.thumb(path, thumbWidth, thumbHeight)
 				.then((url) => {
+					if (generation !== thumbGen) {
+						return;
+					}
 					thumbs[path] = url;
 				})
 				.catch(() => {})
 				.finally(() => {
-					thumbInflight.delete(path);
+					if (generation === thumbGen) {
+						thumbInflight.delete(path);
+					}
 				});
 		}
 	});
@@ -170,6 +180,33 @@
 	function thumbFor(src: string): string {
 		return thumbs[mediaPath(projectDir(filePath), src)] ?? '';
 	}
+
+	/** checkFiles reads the soundtrack and pictures from disk and loads their thumbnails again. */
+	function checkFiles() {
+		if (!doc || working) {
+			return;
+		}
+		const dir = projectDir(filePath);
+		const drop = new Set((doc.slots ?? []).map((slot) => mediaPath(dir, slot.src)).filter(Boolean));
+		const next: Record<string, string> = {};
+		for (const [path, url] of Object.entries(thumbs)) {
+			if (!drop.has(path)) {
+				next[path] = url;
+			}
+		}
+		thumbs = next;
+		for (const path of drop) {
+			thumbInflight.delete(path);
+		}
+		thumbGen += 1;
+		scan += 1;
+	}
+
+	$effect(() => {
+		const onFocus = () => checkFiles();
+		window.addEventListener('focus', onFocus);
+		return () => window.removeEventListener('focus', onFocus);
+	});
 
 	function showError(message: string, slot = 0, kind: 'plan' | 'action' = 'action') {
 		error = message;
@@ -709,6 +746,7 @@
 				<Button variant="outline" onclick={() => edit(sortByName(doc!))}>Sort by name</Button>
 				<Button variant="outline" onclick={() => edit(shuffleSlots(doc!))}>Shuffle pictures</Button>
 				<Button variant="outline" onclick={() => edit(shuffleMoves(doc!))}>Shuffle moves</Button>
+				<Button variant="outline" onclick={checkFiles} disabled={working}>Re-scan Images/Audio</Button>
 			</div>
 
 			<div class="flex flex-col gap-1" role="group" aria-labelledby="timeline-label">

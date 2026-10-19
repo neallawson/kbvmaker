@@ -343,6 +343,48 @@ describe('Editor', () => {
 		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).disabled).toBe(true);
 	});
 
+	it('re-scans images and audio from the button and when the window returns', async () => {
+		const user = userEvent.setup();
+		const api = client({
+			montage: 1,
+			audio: 'song.mp3',
+			timing: { policy: 'fit-audio' },
+			slots: [{ src: 'a.jpg', mode: 'in-center' }]
+		});
+		let plans = 0;
+		let thumbs = 0;
+		const plan = api.client.planBody.bind(api.client);
+		api.client.planBody = async (body, dir) => {
+			plans += 1;
+			if (plans === 1) {
+				throw new RuleError(0, 'missing-media', 'Missing picture 1: a.jpg');
+			}
+			return plan(body, dir);
+		};
+		api.client.thumb = async () => {
+			thumbs += 1;
+			return `data:image/jpeg;base64,${thumbs}`;
+		};
+		const host: Host = {
+			name: 'window',
+			pickMontage: async () => '/films/piece.montage.json'
+		};
+		render(Editor, { client: api.client, host });
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+
+		expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('Missing picture 1: a.jpg'));
+		await waitFor(() => expect(thumbs).toBeGreaterThan(0));
+		const thumbsBefore = thumbs;
+		await user.click(screen.getByRole('button', { name: 'Re-scan Images/Audio' }));
+		await waitFor(() => expect(plans).toBe(2));
+		await waitFor(() => expect(thumbs).toBeGreaterThan(thumbsBefore));
+		await waitFor(() => expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).disabled).toBe(false));
+
+		const plansBeforeFocus = plans;
+		window.dispatchEvent(new Event('focus'));
+		await waitFor(() => expect(plans).toBe(plansBeforeFocus + 1));
+	});
+
 	it('drops a picture into a new place on the timeline', async () => {
 		const user = userEvent.setup();
 		const api = client();

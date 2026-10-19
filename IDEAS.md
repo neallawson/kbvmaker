@@ -1060,7 +1060,13 @@ picture. It does not rename the file to the Look.
 
 Save writes the Montage, including a project that does not yet have a song
 or a picture. Export shell script and Render both save first. Each asks
-where its file should go. Render shows the ffmpeg log when a command fails.
+where its file should go. Render and Export stay off until a plan can see
+the soundtrack and every picture. That plan names every missing soundtrack,
+picture, and backdrop above the buttons. **Re-scan Images/Audio** reads those files
+from disk and loads the thumbnails again. The same check runs when the
+window comes back to the front, so a file put back at its old path, or a
+new picture saved over the same name, shows up without a change to the
+Montage. Render shows the ffmpeg log when a command fails.
 Unsaved edits are visible. An engine error names the picture it belongs to.
 
 Enter and exit stills, a per-picture fill, and a live ffmpeg stream are not
