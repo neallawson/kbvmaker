@@ -11,7 +11,7 @@ picture. It is not a scripting language. It has no expressions, variables, or
 control flow. Easing is an enum. A later version may add names; it does not
 add a grammar.
 
-Ken Burns moves are four built-in modes. The format also holds holds, pans,
+Ken Burns moves are the built-in modes in section 10. The format also holds holds, pans,
 zooms, dissolves, and cut lists that have nothing to do with that style.
 
 The application is kbvmaker. The format is Montage. Another engine may
@@ -83,6 +83,7 @@ Document {
   pool?:     Pool
   schedule?: Schedule
   modes?:    { [name]: ModeDef }
+  moves?:    string[]
   slots?:    Slot[]
 }
 ```
@@ -99,6 +100,12 @@ assembled. `plan` and `render` reject a document with neither. `schedule`
 is present only when `pool` is present.
 
 `timing` omitted means `{ "policy": "fit-audio" }`.
+
+`moves`, when present, is the list of mode names Shuffle may assign, in
+the order a Look cycles them. Each name is a built-in mode or a key of
+`modes`, and each name appears once. Choosing a move for one picture may
+use any built-in mode. Plan and render do not read `moves`. An omitted
+`moves` means Shuffle may assign every built-in mode.
 
 ### 4.1 Canvas
 
@@ -622,8 +629,14 @@ proceeds as for authored `motion`.
 `{ "from": "left", "to": "right" }`. The hold's pan is `left`, which clamps
 to center while the zoom is `full`.
 
+`in-right-left` is the same with the travel pan
+`{ "from": "right", "to": "left" }`. The hold's pan is `right`.
+
 `in-top-bottom` is the same with the travel pan
 `{ "from": "top", "to": "bottom" }` and the hold's pan `top`.
+
+`in-bottom-top` is the same with the travel pan
+`{ "from": "bottom", "to": "top" }` and the hold's pan `bottom`.
 
 `out-center`:
 
@@ -646,7 +659,8 @@ to center while the zoom is `full`.
 ```
 
 `hold` has no moving span, so a short opaque range is legal as long as it is
-positive. The four traveling modes are not.
+positive. The other built-in modes travel, so the hold has to fit inside
+the opaque range.
 
 Project modes and inline `motion` use the same segment rules. Family `scan`
 opts out of the reveal check: the picture may stay at `fill` and only pan.

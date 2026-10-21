@@ -4,8 +4,10 @@ export type LookId = 'classic' | 'photo-film' | 'quick-slides';
 
 export const moves = [
 	{ id: 'in-center', label: 'Slow zoom in' },
-	{ id: 'in-left-right', label: 'Pan across' },
+	{ id: 'in-left-right', label: 'Pan right' },
+	{ id: 'in-right-left', label: 'Pan left' },
 	{ id: 'in-top-bottom', label: 'Drift down' },
+	{ id: 'in-bottom-top', label: 'Drift up' },
 	{ id: 'out-center', label: 'Slow zoom out' },
 	{ id: 'hold', label: 'Hold still' }
 ] as const;
@@ -64,27 +66,42 @@ export function applyLook(file: MontageFile, id: LookId): MontageFile {
 		output: { ...file.output, width: 1920, height: 1080 },
 		defaults: look.defaults,
 		timing: look.timing,
+		moves: [...look.cycle],
 		slots
 	};
 }
 
-export function modeForNewPicture(id: LookId | null, index: number): string {
-	if (!id) {
-		return 'in-center';
-	}
-	const cycle = looks[id].cycle;
+function modeForNewPicture(file: MontageFile, index: number): string {
+	const cycle = file.moves?.length ? file.moves : ['in-center'];
 	return cycle[index % cycle.length];
 }
 
-export function addPictures(file: MontageFile, paths: string[], look: LookId | null): MontageFile {
+export function addPictures(file: MontageFile, paths: string[]): MontageFile {
 	const slots = [...(file.slots ?? [])];
 	for (const src of paths) {
 		if (!src) {
 			continue;
 		}
-		slots.push({ src, mode: modeForNewPicture(look, slots.length) });
+		slots.push({ src, mode: modeForNewPicture(file, slots.length) });
 	}
 	return { ...file, slots };
+}
+
+/** moveChoices is every built-in move, plus a picture's current move when the file named another one. */
+export function moveChoices(mode?: string): { id: string; label: string }[] {
+	const list = moves.map((move) => ({ id: move.id, label: move.label }));
+	if (mode && !list.some((move) => move.id === mode)) {
+		list.push(moveLabel(mode));
+	}
+	return list;
+}
+
+function moveLabel(id: string): { id: string; label: string } {
+	return moves.find((move) => move.id === id) ?? { id, label: id };
+}
+
+function movePool(file: MontageFile): readonly string[] {
+	return file.moves?.length ? file.moves : moves.map((move) => move.id);
 }
 
 export function setAudio(file: MontageFile, audio: string): MontageFile {
@@ -352,11 +369,12 @@ export function shuffleSlots(file: MontageFile, random: () => number = Math.rand
 }
 
 export function shuffleMoves(file: MontageFile, random: () => number = Math.random): MontageFile {
+	const pool = movePool(file);
 	return {
 		...file,
 		slots: (file.slots ?? []).map((slot) => ({
 			...slot,
-			mode: moves[Math.floor(random() * moves.length)].id
+			mode: pool[Math.floor(random() * pool.length)]
 		}))
 	};
 }

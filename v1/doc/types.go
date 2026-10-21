@@ -18,6 +18,7 @@ type Document struct {
 	Pool     *Pool     `json:"pool,omitempty"`
 	Schedule *Schedule `json:"schedule,omitempty"`
 	Modes    ModeMap   `json:"modes,omitempty"`
+	Moves    []string  `json:"moves,omitempty"`
 	Slots    []Slot    `json:"slots,omitempty"`
 }
 

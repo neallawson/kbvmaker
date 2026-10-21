@@ -35,6 +35,44 @@ func TestDecodeDefaults(t *testing.T) {
 	}
 }
 
+func TestMoveList(t *testing.T) {
+	d, err := Decode([]byte(`{
+		"montage": 1,
+		"audio": "a.mp3",
+		"moves": ["in-center", "in-right-left", "in-bottom-top"],
+		"slots": [{ "src": "a.jpg", "mode": "in-right-left" }]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Moves) != 3 || d.Moves[1] != "in-right-left" || d.Moves[2] != "in-bottom-top" {
+		t.Fatalf("moves %v", d.Moves)
+	}
+
+	d, err = Decode([]byte(`{"montage":1,"audio":"a.mp3","moves":["nope"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = d.ValidateShape()
+	re, ok := rule.As(err)
+	if !ok || re.Code != "mode" || !strings.Contains(re.Msg, "unknown mode") {
+		t.Fatalf("unknown move: %v", err)
+	}
+
+	d, err = Decode([]byte(`{"montage":1,"audio":"a.mp3","moves":["hold","hold"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = d.ValidateShape()
+	re, ok = rule.As(err)
+	if !ok || re.Code != "mode" || !strings.Contains(re.Msg, "twice") {
+		t.Fatalf("duplicate move: %v", err)
+	}
+}
+
 func TestRejectsUnknownFieldAndWrongVersion(t *testing.T) {
 	_, err := Decode([]byte(`{"montage":1,"audio":"a.mp3","slots":[],"nope":true}`))
 	re, ok := rule.As(err)

@@ -99,6 +99,13 @@ fi
 printf '%s\n' "Building the client"
 pnpm --dir frontend build
 
+stage=cmd/desktop/client
+rm -rf "$stage"
+cp -a frontend/build "$stage"
+cleanup() { rm -rf "$stage"; }
+trap cleanup EXIT
+
 printf '%s\n' "Building ${out}"
 go build -tags "$tags" -o "$out" ./cmd/desktop
+go test -tags "$tags" -count=1 -run TestClientBuild ./cmd/desktop
 printf '%s\n' "Built ./${out}"

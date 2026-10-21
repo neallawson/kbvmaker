@@ -43,7 +43,7 @@ Zoom `1.0` means the whole photograph is in frame. Apply rotation metadata befor
 
 ## Building the GUI
 
-`./scripts/build` builds the client and the GUI. On Linux it selects WebKitGTK 4.1 or 4.0 with pkg-config. Windows PowerShell uses `scripts/build.ps1`. Leave those commands out of the README. The script prints the package to install when the library is missing.
+`./scripts/build` builds the client and embeds it in the GUI in the same run. The window does not read `frontend/build` when it starts. On Linux the script selects WebKitGTK 4.1 or 4.0 with pkg-config. Windows PowerShell uses `scripts/build.ps1`. Leave those commands out of the README. The script prints the package to install when the library is missing. `kbvmaker serve -static` is the browser host and is a separate program.
 
 ## Tests
 

@@ -908,14 +908,19 @@ the first four, plus `hold`. The window's names for them:
 | On screen | In the file |
 | --- | --- |
 | Slow zoom in | `in-center` |
-| Pan across | `in-left-right` |
+| Pan right | `in-left-right` |
+| Pan left | `in-right-left` |
 | Drift down | `in-top-bottom` |
+| Drift up | `in-bottom-top` |
 | Slow zoom out | `out-center` |
 | Hold still | `hold` |
 
 The script's `i % 4` is not four presets of a video. It is one video that
-cycles four moves. Photo film keeps three of them: slow zoom in, pan across,
-and slow zoom out. Drift down stays a choice on a single picture.
+cycles four moves. Photo film keeps three of them: slow zoom in, pan right,
+and slow zoom out. The move menu on one picture lists every move. Shuffle
+moves uses the Look's list, and Save writes that list on the Montage as
+`moves`. Pan left, drift up, drift down, and hold still are in the menu.
+The three shipped Looks do not assign them.
 
 A **Look** is a composition preset: a recipe with no photographs in it. It
 carries defaults (join, hold, zoom span, fill, ease), a timing policy, an
@@ -946,7 +951,7 @@ the first screen. The rest sit under More looks.
   slow zoom in and slow zoom out. Load, render, done.
 - **Photo film.** The shell script. `fit-audio`, fade `1.5`, hold `1`, zoom
   span `0.4`, blurred photo, same output size. Assignment cycles slow zoom
-  in, pan across, and slow zoom out.
+  in, pan right, and slow zoom out.
 - **Quick slides.** `fixed-clip` of `5` seconds, dissolve `0.5`, hold `0`,
   zoom span `0.2`, black bars. Every picture is a slow zoom in. Pins are
   cleared, because this Look gives every picture the same length.
@@ -1038,22 +1043,24 @@ changes the two lengths, as described under Timeline editing. The song's
 length, in minutes:seconds and in seconds, sits beside its name. A file
 dialog opens again in the folder it used last.
 
-The selected row sets the move by its plain name, and the length box
-described above. Remove and replace change that picture's file. Shuffle
-pictures reorders the list once. Shuffle moves assigns each picture one of
-the plain moves once. Both write the result into the slots. Neither draws
-zoom numbers, and neither changes again on the next open.
+The selected row sets the move by its plain name. The menu lists every
+move. The length box is described above. Remove and replace change that
+picture's file. Shuffle pictures reorders the list once. Shuffle moves
+assigns each picture one move from the Look's list. Both write the result
+into the slots. Neither draws zoom numbers, and neither changes again on
+the next open.
 
 Looks are Classic, Photo film, and Quick slides. Classic is selected for a
-new project. Applying a Look writes its defaults and a mode on every
-picture. It does not rename the file to the Look.
+new project. Applying a Look writes its defaults, a mode on every
+picture, and that Look's move list. It does not rename the file to the Look.
 
 - **Classic.** `fit-audio`, dissolve `1`, hold `0.5`, zoom span `0.25`,
   black bars, output `1920×1080`. Modes alternate slow zoom in and slow
   zoom out.
 - **Photo film.** `fit-audio`, dissolve `1.5`, hold `1`, zoom span `0.4`,
-  blurred photo, same output size. Modes cycle slow zoom in, pan across,
-  and slow zoom out.
+  blurred photo, same output size. Modes cycle slow zoom in, pan right,
+  and slow zoom out. Shuffle moves draws from that list. The menu on one
+  picture still lists every move.
 - **Quick slides.** `fixed-clip` of `5` seconds, dissolve `0.5`, hold `0`,
   zoom span `0.2`, black bars. Every picture is slow zoom in. Pins are
   cleared, because this Look gives every picture the same length.

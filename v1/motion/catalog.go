@@ -10,8 +10,12 @@ func builtin(name string, hold float64) ([]doc.Segment, string, bool) {
 		return zoomIn(hold, doc.PanNamed("center"), doc.PanNamed("center")), "reveal", true
 	case "in-left-right":
 		return zoomIn(hold, doc.PanNamed("left"), doc.PanRamp("left", "right")), "reveal", true
+	case "in-right-left":
+		return zoomIn(hold, doc.PanNamed("right"), doc.PanRamp("right", "left")), "reveal", true
 	case "in-top-bottom":
 		return zoomIn(hold, doc.PanNamed("top"), doc.PanRamp("top", "bottom")), "reveal", true
+	case "in-bottom-top":
+		return zoomIn(hold, doc.PanNamed("bottom"), doc.PanRamp("bottom", "top")), "reveal", true
 	case "out-center":
 		return zoomOut(hold), "reveal", true
 	default:

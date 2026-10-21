@@ -30,6 +30,14 @@ Write-Host "Using the Windows WebView2 runtime"
 Write-Host "Building the client"
 pnpm --dir frontend build
 
-Write-Host "Building kbvmaker-gui.exe"
-go build -tags production -o kbvmaker-gui.exe ./cmd/desktop
-Write-Host "Built .\kbvmaker-gui.exe"
+$stage = "cmd/desktop/client"
+if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+Copy-Item -Recurse frontend/build $stage
+try {
+    Write-Host "Building kbvmaker-gui.exe"
+    go build -tags production -o kbvmaker-gui.exe ./cmd/desktop
+    go test -tags production -count=1 -run TestClientBuild ./cmd/desktop
+    Write-Host "Built .\kbvmaker-gui.exe"
+} finally {
+    if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+}

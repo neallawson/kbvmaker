@@ -72,6 +72,7 @@ type rawDoc struct {
 	Pool     *Pool        `json:"pool"`
 	Schedule *Schedule    `json:"schedule"`
 	Modes    ModeMap      `json:"modes"`
+	Moves    []string     `json:"moves"`
 	Slots    []Slot       `json:"slots"`
 }
 
@@ -189,6 +190,7 @@ func (r rawDoc) document() (*Document, error) {
 	d.Pool = r.Pool
 	d.Schedule = r.Schedule
 	d.Modes = r.Modes
+	d.Moves = r.Moves
 	d.Slots = r.Slots
 	if d.Canvas.Width < d.Output.Width || d.Canvas.Height < d.Output.Height {
 		return nil, rule.E(0, "bad-number", "canvas %dx%d is smaller than output %dx%d",

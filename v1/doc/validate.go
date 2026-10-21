@@ -111,12 +111,43 @@ func (d *Document) ValidateShape() error {
 			}
 		}
 	}
+	if err := validateMoves(d); err != nil {
+		return err
+	}
 	for i, s := range d.Slots {
 		if err := validateSlot(d, s, i+1); err != nil {
 			return err
 		}
 	}
 	return d.pins()
+}
+
+// BuiltinMode reports a mode the engine expands without a project definition.
+func BuiltinMode(name string) bool {
+	switch name {
+	case "hold", "in-center", "out-center", "in-left-right", "in-right-left", "in-top-bottom", "in-bottom-top":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateMoves(d *Document) error {
+	seen := map[string]bool{}
+	for _, name := range d.Moves {
+		if !modeRe.MatchString(name) {
+			return rule.E(0, "mode", "mode name %q", name)
+		}
+		if seen[name] {
+			return rule.E(0, "mode", "move %s is listed twice", name)
+		}
+		seen[name] = true
+		if _, ok := d.Modes[name]; ok || BuiltinMode(name) {
+			continue
+		}
+		return rule.E(0, "mode", "unknown mode %q", name)
+	}
+	return nil
 }
 
 func (d *Document) ready() error {

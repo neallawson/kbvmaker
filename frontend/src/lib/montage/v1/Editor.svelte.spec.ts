@@ -50,6 +50,7 @@ function client(read?: MontageFile): { client: Client; plans: MontageFile[] } {
 					audio: read.audio,
 					timing: read.timing,
 					defaults: read.defaults,
+					moves: read.moves,
 					slots: read.slots?.map((slot) => ({ ...slot }))
 				};
 			},
@@ -110,6 +111,59 @@ describe('Editor', () => {
 		expect(label.className).toContain('min-w-0');
 		expect(label.querySelector('span')?.className).toContain('break-all');
 		expect(screen.getByText('/films/piece.montage.json').className).toContain('break-all');
+	});
+
+	it('offers every move when changing one picture', async () => {
+		const user = userEvent.setup();
+		render(Editor, { client: client().client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+
+		const everyMove = [
+			'Slow zoom in',
+			'Pan right',
+			'Pan left',
+			'Drift down',
+			'Drift up',
+			'Slow zoom out',
+			'Hold still'
+		];
+		const options = () => [...(screen.getByRole('combobox') as HTMLSelectElement).options].map((option) => option.text);
+		expect(options()).toEqual(everyMove);
+
+		await user.click(screen.getByRole('button', { name: 'Photo film' }));
+		expect(options()).toEqual(everyMove);
+
+		await user.click(screen.getByRole('button', { name: 'Quick slides' }));
+		expect(options()).toEqual(everyMove);
+	});
+
+	it('keeps every move available when the file stores a shorter shuffle list', async () => {
+		const user = userEvent.setup();
+		render(Editor, {
+			client: client({
+				montage: 1,
+				audio: 'song.mp3',
+				moves: ['in-center', 'in-right-left'],
+				slots: [{ src: 'a.jpg', mode: 'in-right-left' }]
+			}).client,
+			host: browser
+		});
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+		const move = (await screen.findByRole('combobox')) as HTMLSelectElement;
+		expect([...move.options].map((option) => option.text)).toEqual([
+			'Slow zoom in',
+			'Pan right',
+			'Pan left',
+			'Drift down',
+			'Drift up',
+			'Slow zoom out',
+			'Hold still'
+		]);
+		expect(move.value).toBe('in-right-left');
 	});
 
 	it('shows a picture on the timeline before a song is chosen', async () => {

@@ -12,6 +12,7 @@
 		dropIndex,
 		gripHit,
 		settledLayout,
+		moveChoices,
 		moveSlot,
 		newProject,
 		mediaPath,
@@ -324,7 +325,7 @@
 		if (!chosen.length || !doc) {
 			return;
 		}
-		edit(addPictures(doc, chosen, look));
+		edit(addPictures(doc, chosen));
 		pictureDraft = '';
 	}
 
@@ -894,7 +895,7 @@
 										value={slot.mode ?? 'in-center'}
 										onchange={(event) => edit(setMode(doc!, index, event.currentTarget.value))}
 									>
-										{#each [{ id: 'in-center', label: 'Slow zoom in' }, { id: 'in-left-right', label: 'Pan across' }, { id: 'in-top-bottom', label: 'Drift down' }, { id: 'out-center', label: 'Slow zoom out' }, { id: 'hold', label: 'Hold still' }] as move (move.id)}
+										{#each moveChoices(slot.mode) as move (move.id)}
 											<option value={move.id}>{move.label}</option>
 										{/each}
 									</select>

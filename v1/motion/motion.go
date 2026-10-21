@@ -32,7 +32,7 @@ func Resolve(s doc.Slot, modes doc.ModeMap, place clock.Place, zoomSpan, holdDef
 
 func traveling(name string) bool {
 	switch name {
-	case "in-center", "in-left-right", "in-top-bottom", "out-center":
+	case "in-center", "in-left-right", "in-right-left", "in-top-bottom", "in-bottom-top", "out-center":
 		return true
 	default:
 		return false

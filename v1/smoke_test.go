@@ -57,7 +57,9 @@ func TestFFmpegParsesEveryMove(t *testing.T) {
 		{"in-center", "", smokeSlot("in-center")},
 		{"out-center", "", smokeSlot("out-center")},
 		{"in-left-right", "", smokeSlot("in-left-right")},
+		{"in-right-left", "", smokeSlot("in-right-left")},
 		{"in-top-bottom", "", smokeSlot("in-top-bottom")},
+		{"in-bottom-top", "", smokeSlot("in-bottom-top")},
 		{
 			"scan",
 			`, "modes": {"drift": {"family": "scan", "motion": [{"dur": "rest", "zoom": "fill", "pan": {"from": "left", "to": "right"}}]}}`,

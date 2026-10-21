@@ -6,8 +6,9 @@
 package main
 
 import (
-	"flag"
+	"embed"
 	"fmt"
+	"io/fs"
 	"os"
 
 	"github.com/wailsapp/wails/v2"
@@ -18,6 +19,9 @@ import (
 	"kbvmaker/web"
 )
 
+//go:embed all:client
+var embeddedClient embed.FS
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -26,14 +30,12 @@ func main() {
 }
 
 func run(args []string) error {
-	fs := flag.NewFlagSet("desktop", flag.ContinueOnError)
-	static := fs.String("static", "frontend/build", "directory of the built client")
-	if err := fs.Parse(args); err != nil {
-		return err
+	if len(args) > 0 {
+		return fmt.Errorf("kbvmaker-gui takes no arguments")
 	}
-	info, err := os.Stat(*static)
-	if err != nil || !info.IsDir() {
-		return fmt.Errorf("client build %s is missing; run pnpm --dir frontend build", *static)
+	client, err := clientAssets()
+	if err != nil {
+		return err
 	}
 	probe, err := media.NewFFProbe()
 	if err != nil {
@@ -46,10 +48,21 @@ func run(args []string) error {
 		Width:  1100,
 		Height: 760,
 		AssetServer: &assetserver.Options{
-			Assets:  os.DirFS(*static),
+			Assets:  client,
 			Handler: handler,
 		},
 		OnStartup: dialogs.startup,
 		Bind:      []interface{}{dialogs, &API{handler: handler}},
 	})
+}
+
+func clientAssets() (fs.FS, error) {
+	client, err := fs.Sub(embeddedClient, "client")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := fs.Stat(client, "index.html"); err != nil {
+		return nil, fmt.Errorf("the GUI was built without its client; run ./scripts/build")
+	}
+	return client, nil
 }
