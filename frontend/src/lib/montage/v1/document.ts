@@ -49,23 +49,26 @@ export function newProject(): MontageFile {
 
 export function applyLook(file: MontageFile, id: LookId): MontageFile {
 	const look = looks[id];
+	const pacedBySong = look.timing.policy === 'fit-audio' && !!file.audio;
 	const slots = (file.slots ?? []).map((slot, index) => {
 		const next: Picture = { ...slot, mode: look.cycle[index % look.cycle.length] };
-		if (look.timing.policy !== 'fit-audio') {
+		if (!pacedBySong && look.timing.policy !== 'fit-audio') {
 			delete next.dur;
 		}
 		return next;
 	});
-	if (look.timing.policy === 'fit-audio' && slots.length > 1 && slots.every((slot) => slot.dur != null)) {
+	if (pacedBySong && slots.length > 1 && slots.every((slot) => slot.dur != null)) {
 		const last = slots.length - 1;
 		slots[last] = withoutDur(slots[last]);
 	}
+	const timing =
+		pacedBySong || look.timing.policy !== 'fit-audio' ? { ...look.timing } : { policy: 'fixed-clip' as const, clip: 5 };
 	return {
 		...file,
 		canvas: look.canvas,
 		output: { ...file.output, width: 1920, height: 1080 },
 		defaults: look.defaults,
-		timing: look.timing,
+		timing,
 		moves: [...look.cycle],
 		slots
 	};
@@ -104,8 +107,140 @@ function movePool(file: MontageFile): readonly string[] {
 	return file.moves?.length ? file.moves : moves.map((move) => move.id);
 }
 
-export function setAudio(file: MontageFile, audio: string): MontageFile {
-	return { ...file, audio };
+/**
+ * setAudio attaches a soundtrack.
+ * Classic and Photo film, chosen in this session, hand the clock to the song.
+ * Quick slides, and a file opened already on a picture clock, keep that clock.
+ * A typed film length steps aside so the song and the film are not both the clock.
+ */
+export function setAudio(file: MontageFile, audio: string, look?: LookId | null): MontageFile {
+	const policy = file.timing?.policy ?? 'fit-audio';
+	if (look === 'quick-slides' || (look == null && (policy === 'fixed-clip' || policy === 'explicit'))) {
+		if (file.timing?.duration == null) {
+			return { ...file, audio };
+		}
+		const timing = { ...file.timing };
+		delete timing.duration;
+		return { ...file, audio, timing };
+	}
+	return { ...file, audio, timing: { policy: 'fit-audio' } };
+}
+
+/**
+ * clearAudio drops the song.
+ * A song-paced film keeps each picture's length: `sharedSeconds` is the pace
+ * the pictures without their own time were using, and pins stay.
+ */
+export function clearAudio(file: MontageFile, sharedSeconds: number): MontageFile {
+	const { audio: _audio, ...rest } = file;
+	if ((file.timing?.policy ?? 'fit-audio') !== 'fit-audio') {
+		return rest;
+	}
+	return { ...rest, timing: { policy: 'fixed-clip', clip: roundSeconds(sharedSeconds) } };
+}
+
+/** setTimeEach is the unlocked pace. Pictures without their own length use it, and the film grows with them. */
+export function setTimeEach(file: MontageFile, seconds: number): MontageFile {
+	return { ...file, timing: { policy: 'fixed-clip', clip: roundSeconds(seconds) } };
+}
+
+/**
+ * setFilmLength edits the finished video.
+ * With no custom times and the lock off, it updates the shared pace and stays unlocked.
+ * With the lock on, it stores that length. A custom time leaves the field alone.
+ */
+export function setFilmLength(file: MontageFile, seconds: number): MontageFile {
+	const locked = (file.timing?.policy ?? 'fit-audio') === 'fit-audio';
+	if (!locked && hasCustomTime(file)) {
+		return file;
+	}
+	if (!locked) {
+		const count = Math.max(file.slots?.length ?? 0, 1);
+		return setTimeEach(file, clipFromFilm(count, seconds, joinSeconds(file)));
+	}
+	return lockFilm(file, seconds);
+}
+
+/** lockFilm keeps the finished length. Pins stay, and one picture keeps sharing that length. */
+export function lockFilm(file: MontageFile, filmSeconds: number): MontageFile {
+	let slots = [...(file.slots ?? [])];
+	if (slots.length > 1 && slots.every((slot) => slot.dur != null)) {
+		const last = slots.length - 1;
+		slots[last] = withoutDur(slots[last]);
+	}
+	return {
+		...file,
+		slots,
+		timing: { policy: 'fit-audio', duration: roundSeconds(filmSeconds) }
+	};
+}
+
+/** unlockFilm returns to a shared pace. Pins stay as their own lengths, and the film becomes their sum. */
+export function unlockFilm(file: MontageFile, shared: number): MontageFile {
+	return { ...file, timing: { policy: 'fixed-clip', clip: roundSeconds(shared) } };
+}
+
+export function joinSeconds(file: MontageFile): number {
+	return file.defaults?.join?.duration ?? 1;
+}
+
+export function hasCustomTime(file: MontageFile): boolean {
+	return (file.slots ?? []).some((slot) => slot.dur != null);
+}
+
+/** filmFromClips is the finished length after dissolves overlap. */
+export function filmFromClips(count: number, lengths: number[], join: number): number {
+	if (count <= 0) {
+		return 0;
+	}
+	let sum = 0;
+	for (let i = 0; i < count; i++) {
+		sum += lengths[i] ?? 0;
+		if (i < count - 1) {
+			sum -= join;
+		}
+	}
+	return roundSeconds(sum);
+}
+
+/** clipFromFilm is the even picture length that finishes at `film` after overlaps. */
+export function clipFromFilm(count: number, film: number, join: number): number {
+	if (count <= 1) {
+		return roundSeconds(film);
+	}
+	return roundSeconds((film + (count - 1) * join) / count);
+}
+
+/** outputLength is the finished film from the file alone, before a plan comes back. */
+export function outputLength(file: MontageFile): number {
+	if ((file.timing?.policy ?? 'fit-audio') === 'fit-audio' && file.timing?.duration != null) {
+		return file.timing.duration;
+	}
+	const count = file.slots?.length ?? 0;
+	if (count === 0) {
+		return file.timing?.clip ?? file.timing?.duration ?? 5;
+	}
+	const clip = file.timing?.clip ?? 5;
+	return filmFromClips(
+		count,
+		(file.slots ?? []).map((slot) => slot.dur ?? clip),
+		joinSeconds(file)
+	);
+}
+
+/** canPlan is true once the pictures and their clock are both in the file. */
+export function canPlan(file: MontageFile): boolean {
+	if (!file.slots?.length) {
+		return false;
+	}
+	if (file.audio) {
+		return true;
+	}
+	const policy = file.timing?.policy ?? 'fit-audio';
+	if (policy === 'fixed-clip' || policy === 'explicit') {
+		return true;
+	}
+	return policy === 'fit-audio' && file.timing?.duration != null;
 }
 
 export function moveSlot(file: MontageFile, index: number, delta: -1 | 1): MontageFile {

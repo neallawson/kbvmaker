@@ -184,7 +184,91 @@ func TestFitAudioRejectsAPinOnEveryPicture(t *testing.T) {
 	}
 	err = d.Validate()
 	re, ok := rule.As(err)
-	if !ok || re.Code != "bad-time" {
+	if !ok || re.Code != "bad-time" || re.Msg != "leave one picture sharing the song" {
 		t.Fatalf("pins: %v", err)
+	}
+}
+
+func TestSilentClocks(t *testing.T) {
+	fixed, err := Decode([]byte(`{
+	  "montage": 1,
+	  "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [
+	    {"src": "a.jpg", "mode": "hold", "dur": 8},
+	    {"src": "b.jpg", "mode": "hold"}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fixed.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	locked, err := Decode([]byte(`{
+	  "montage": 1,
+	  "timing": {"policy": "fit-audio", "duration": 41},
+	  "slots": [
+	    {"src": "a.jpg", "mode": "hold"},
+	    {"src": "b.jpg", "mode": "hold", "dur": 8}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := locked.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if !locked.Timing.HasDuration || locked.Timing.Duration != 41 {
+		t.Fatalf("duration %+v", locked.Timing)
+	}
+	body, err := locked.Timing.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != `{"policy":"fit-audio","duration":41}` {
+		t.Fatalf("timing json %s", body)
+	}
+	both, err := Decode([]byte(`{
+	  "montage": 1,
+	  "audio": "song.mp3",
+	  "timing": {"policy": "fit-audio", "duration": 41},
+	  "slots": [{"src": "a.jpg", "mode": "hold"}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = both.Validate()
+	re, ok := rule.As(err)
+	if !ok || re.Msg != "a soundtrack and a film length cannot both set the clock" {
+		t.Fatalf("both clocks: %v", err)
+	}
+	filmPins, err := Decode([]byte(`{
+	  "montage": 1,
+	  "timing": {"policy": "fit-audio", "duration": 20},
+	  "slots": [
+	    {"src": "a.jpg", "mode": "hold", "dur": 8},
+	    {"src": "b.jpg", "mode": "hold", "dur": 8}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = filmPins.Validate()
+	re, ok = rule.As(err)
+	if !ok || re.Msg != "leave one picture sharing the film" {
+		t.Fatalf("film pins: %v", err)
+	}
+	needsSong, err := Decode([]byte(`{
+	  "montage": 1,
+	  "timing": {"policy": "fit-audio"},
+	  "slots": [{"src": "a.jpg", "mode": "hold"}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = needsSong.Validate()
+	re, ok = rule.As(err)
+	if !ok || re.Code != "missing-field" || re.Msg != "audio" {
+		t.Fatalf("needs song: %v", err)
 	}
 }

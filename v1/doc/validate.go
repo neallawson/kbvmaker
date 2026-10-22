@@ -23,7 +23,8 @@ var anchors = map[string]struct{}{
 }
 
 // Validate checks the document shape. It does not read media.
-// A document that plan or render can run has a song and at least one picture source.
+// A document that plan or render can run has a clock and at least one picture source.
+// The clock is a song, a fit-audio film length, or authored picture lengths.
 func (d *Document) Validate() error {
 	if err := d.ValidateShape(); err != nil {
 		return err
@@ -71,6 +72,17 @@ func (d *Document) ValidateShape() error {
 	}
 	if d.Timing.HasClip && d.Timing.Policy != "fixed-clip" {
 		return rule.E(0, "bad-number", "timing.clip is only valid for fixed-clip")
+	}
+	if d.Timing.HasDuration {
+		if d.Timing.Policy != "fit-audio" {
+			return rule.E(0, "bad-number", "timing.duration is only valid for fit-audio")
+		}
+		if d.Timing.Duration <= 0 {
+			return rule.E(0, "bad-number", "timing.duration %v", d.Timing.Duration)
+		}
+		if d.Audio != "" {
+			return rule.E(0, "bad-time", "a soundtrack and a film length cannot both set the clock")
+		}
 	}
 	if d.Schedule != nil && d.Pool == nil {
 		return rule.E(0, "pool", "schedule requires a pool")
@@ -151,13 +163,31 @@ func validateMoves(d *Document) error {
 }
 
 func (d *Document) ready() error {
-	if d.Audio == "" {
+	if d.Audio == "" && d.needsAudio() {
 		return rule.E(0, "missing-field", "audio")
 	}
 	if len(d.Slots) == 0 && d.Pool == nil {
 		return rule.E(0, "missing-field", "slots or pool")
 	}
 	return nil
+}
+
+// needsAudio reports a clock that still comes from the song.
+// fit-audio can use timing.duration instead. fixed-clip and explicit can
+// use authored slots. markers, a pool, and fit-audio without a duration cannot.
+func (d *Document) needsAudio() bool {
+	switch d.Timing.Policy {
+	case "markers":
+		return true
+	case "fit-audio":
+		return !d.Timing.HasDuration
+	case "fixed-clip":
+		return len(d.Slots) == 0
+	case "explicit":
+		return false
+	default:
+		return true
+	}
 }
 
 func (d *Document) pins() error {
@@ -169,7 +199,14 @@ func (d *Document) pins() error {
 			return nil
 		}
 	}
-	return rule.E(len(d.Slots), "bad-time", "leave one picture sharing the song")
+	return rule.E(len(d.Slots), "bad-time", "leave one picture sharing the %s", clockName(d))
+}
+
+func clockName(d *Document) string {
+	if d.Audio == "" {
+		return "film"
+	}
+	return "song"
 }
 
 func validatePool(p *Pool) error {
@@ -253,13 +290,13 @@ func validateSlot(d *Document, s Slot, slot int) error {
 		if s.Dur == nil || *s.Dur <= 0 {
 			return rule.E(slot, "bad-time", "explicit timing needs dur > 0")
 		}
-	case "fit-audio":
+	case "fit-audio", "fixed-clip":
 		if s.Dur != nil && *s.Dur <= 0 {
 			return rule.E(slot, "bad-time", "dur %v", *s.Dur)
 		}
 	default:
 		if s.Dur != nil {
-			return rule.E(slot, "bad-time", "dur is only valid under fit-audio or explicit timing")
+			return rule.E(slot, "bad-time", "dur is only valid under fit-audio, fixed-clip, or explicit timing")
 		}
 	}
 	switch d.Timing.Policy {

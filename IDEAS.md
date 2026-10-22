@@ -999,10 +999,10 @@ values.
 
 ### Picture length
 
-The song is the clock. `fit-audio` still makes the video the length of the
-song. A picture with no `dur` shares that song with the other unpinned
-pictures. The number the list shows for an unpinned picture is the resolved
-clip length, and it is not written into the file.
+The song is the clock when the project has one. `fit-audio` still makes the
+video the length of the song. A picture with no `dur` shares that song with
+the other unpinned pictures. The number the list shows for an unpinned
+picture is the resolved clip length, and it is not written into the file.
 
 Typing a length stores `dur` on that slot only. The other unpinned pictures
 divide what remains, overlaps included. Clearing the box, or Remove custom
@@ -1012,6 +1012,42 @@ picture longer than the dissolve. When it does not, the plan error names
 that picture.
 
 One picture is the whole song. Its length is shown and is not editable.
+
+### No soundtrack
+
+The clock is two tabs. **Soundtrack** is open for a new project: the song
+picker and the song length. **No Soundtrack** is the picture clock. The
+selected tab is the mode. Opening No Soundtrack removes the song and keeps
+the picture lengths already on screen. Opening Soundtrack shows the picker
+and does not change the clock until a file is chosen.
+
+**Film length** is display only, the same kind of line as the song clock
+(`m:ss · Ns`). **Time for each picture** is the one typed field. A new
+project is `fixed-clip` of 5 seconds. Adding a picture adds that time.
+Removing one gives it back. Ten pictures at 5 seconds with a 1 second
+dissolve are a 41 second film: `N * (clip - x) + x`. The readout is that
+sum.
+
+A custom time stores `dur` on that slot and leaves the other pictures at
+`clip`. The readout grows or shrinks with that change. After a grip drag
+the film is `explicit` and has no single pace, so Time for each picture is
+hidden and the per-picture lengths remain. Quick slides still clears those
+times and keeps one length for every picture, so that field stays closed.
+
+A song and a typed length are not both the clock. Adding a soundtrack while
+Classic or Photo film is the Look hands the clock to the song and keeps
+pins. Quick slides stays at its picture clock and the song is mixed to
+whichever is shorter. An opened file that is already on a picture clock
+keeps that clock when a song is added. Leaving the song stores `fixed-clip`
+at the shared picture pace and keeps pins, so those lengths do not jump.
+The editor does not write `timing.duration`. A file that already has it
+still opens on No Soundtrack: the readout is that length, and editing Time
+for each picture switches the file to `fixed-clip`.
+
+`plan` and `render` accept the silent document, including an older file
+that stores `timing.duration`. The mux writes the video stream and no audio
+stream. Fit-audio with neither a song nor `duration` still cannot plan.
+Markers and a pool still need a song.
 
 The timeline draws these resolved lengths. Dragging a dissolve to change
 them is under Timeline editing.
@@ -1054,22 +1090,24 @@ Looks are Classic, Photo film, and Quick slides. Classic is selected for a
 new project. Applying a Look writes its defaults, a mode on every
 picture, and that Look's move list. It does not rename the file to the Look.
 
-- **Classic.** `fit-audio`, dissolve `1`, hold `0.5`, zoom span `0.25`,
-  black bars, output `1920×1080`. Modes alternate slow zoom in and slow
-  zoom out.
-- **Photo film.** `fit-audio`, dissolve `1.5`, hold `1`, zoom span `0.4`,
-  blurred photo, same output size. Modes cycle slow zoom in, pan right,
-  and slow zoom out. Shuffle moves draws from that list. The menu on one
-  picture still lists every move.
+- **Classic.** With a song, `fit-audio`. With no song, `fixed-clip` of 5
+  seconds, and the finished length is shown. Dissolve `1`, hold `0.5`,
+  zoom span `0.25`, black bars, output `1920×1080`. Modes alternate slow
+  zoom in and slow zoom out.
+- **Photo film.** The same clock as Classic. Dissolve `1.5`, hold `1`, zoom
+  span `0.4`, blurred photo, same output size. Modes cycle slow zoom in, pan
+  right, and slow zoom out. Shuffle moves draws from that list. The menu on
+  one picture still lists every move.
 - **Quick slides.** `fixed-clip` of `5` seconds, dissolve `0.5`, hold `0`,
   zoom span `0.2`, black bars. Every picture is slow zoom in. Pins are
-  cleared, because this Look gives every picture the same length.
+  cleared, because this Look gives every picture the same length. A song
+  does not restretch the pictures.
 
 Save writes the Montage, including a project that does not yet have a song
 or a picture. Export shell script and Render both save first. Each asks
 where its file should go. Render and Export stay off until a plan can see
-the soundtrack and every picture. That plan names every missing soundtrack,
-picture, and backdrop above the buttons. **Re-scan Images/Audio** reads those files
+every picture and, when the film uses one, the soundtrack. That plan names
+every missing soundtrack, picture, and backdrop above the buttons. **Re-scan Pictures/Audio** reads those files
 from disk and loads the thumbnails again. The same check runs when the
 window comes back to the front, so a file put back at its old path, or a
 new picture saved over the same name, shows up without a change to the

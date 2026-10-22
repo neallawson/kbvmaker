@@ -58,12 +58,15 @@ type Join struct {
 }
 
 // Timing chooses how slot durations are derived.
+// Duration is the finished film length for fit-audio when there is no soundtrack.
 type Timing struct {
-	Policy   string  `json:"-"`
-	Clip     float64 `json:"-"`
-	Count    int     `json:"-"`
-	HasClip  bool    `json:"-"`
-	HasCount bool    `json:"-"`
+	Policy      string  `json:"-"`
+	Clip        float64 `json:"-"`
+	Duration    float64 `json:"-"`
+	Count       int     `json:"-"`
+	HasClip     bool    `json:"-"`
+	HasDuration bool    `json:"-"`
+	HasCount    bool    `json:"-"`
 }
 
 // Pool is a directory, a list file, or an authored file list.

@@ -92,7 +92,10 @@ Document {
 
 `audio` is the soundtrack. The song length is the container duration reported
 by ffprobe. The editor may omit `audio` while a project is still being
-assembled. `plan` and `render` reject a document with no audio.
+assembled. `plan` and `render` also accept a document with no audio when the
+timing policy has its own clock: `fit-audio` with `duration`, `fixed-clip`
+with authored slots, or `explicit` with authored slots. A pool, `markers`,
+and `fit-audio` without `duration` still need a song.
 
 The document has `slots`, or `pool`, or both only in the way Baking
 describes. The editor may omit both while a project is still being
@@ -295,8 +298,10 @@ slot was detached from a mode.
 `hold` is allowed only with `mode`. It replaces `defaults.hold` when that
 mode is expanded. `dur` on a slot is a clip length in seconds. It is
 required under `explicit`. Under `fit-audio` it is optional and means that
-picture's length is pinned; slots that omit it share the rest of the song
-(section 7.1). `until` is allowed only under `markers`.
+picture's length is pinned; slots that omit it share the rest of the song,
+or the rest of `timing.duration` when there is no soundtrack (section 7.1).
+Under `fixed-clip` it is optional and replaces `clip` for that slot only
+(section 7.2). `until` is allowed only under `markers`.
 
 Mode names, including keys of `modes`, match `[a-z0-9]+(-[a-z0-9]+)*`.
 
@@ -395,10 +400,18 @@ The first slot has no fade in. The last has no fade out. A hold written from
 
 ### 7.1 fit-audio
 
-`N` is the number of slots. `D` is the song length. `x` is `JoinDur` when
-every join has that same duration. Version 1 of `fit-audio` requires every
-join to share one duration; per-slot join overrides belong to `markers` and
-`explicit`.
+`N` is the number of slots. `D` is the song length. When `audio` is omitted,
+`D` is `timing.duration` instead:
+
+```
+Timing { policy: "fit-audio", duration: number }
+```
+
+`duration` is `> 0`. A document that sets both `audio` and `duration` is
+rejected: the song and the typed film length cannot both be the clock.
+`x` is `JoinDur` when every join has that same duration. Version 1 of
+`fit-audio` requires every join to share one duration; per-slot join
+overrides belong to `markers` and `explicit`.
 
 ```
 clipDur = (D + (N - 1) * x) / N
@@ -409,7 +422,8 @@ pin. The file stores only the pins. The shared lengths are recomputed and
 are not written back.
 
 Let `P` be the sum of the pins and `k` the number of pins. When `N > 1`,
-`k` must be less than `N`, so one picture still absorbs the song:
+`k` must be less than `N`, so one picture still absorbs the song, or the
+typed film length when there is no soundtrack:
 
 ```
 shared = (D + (N - 1) * x - P) / (N - k)
@@ -419,7 +433,8 @@ Every pin is `> x`, and `shared` is `> x`. Slots that omit `dur` use
 `shared`. When `k` is 0 this is the even split above.
 
 When `N` is 1 the clip is `D`. A `dur` on that only slot is rejected unless
-it equals `D`.
+it equals `D`. With no soundtrack the messages name the film: the only
+picture runs for the whole film, and one picture must keep sharing the film.
 
 On the output timeline the fade between slot `i` and slot `i+1` starts at
 the next slot's start and lasts `x`. With equal clips that start is
@@ -435,18 +450,22 @@ equals `D`.
 Timing { policy: "fixed-clip", clip: number }
 ```
 
-`clip` is `> 0` and is every slot's clip duration. With an authored `slots`
-array, `N` is the length of that array. With a `loop` schedule, `N` falls
-out of the song:
+`clip` is `> 0` and is the clip duration of every slot that omits `dur`.
+A slot may set `dur` to its own clip length, `> x` when `N > 1`. The other
+slots stay at `clip`. The resolved output duration is then the sum of those
+lengths minus the joins, which is `N * (clip - x) + x` when every slot omits
+`dur`. Authored slots do not need a soundtrack. With an authored `slots`
+array, `N` is the length of that array. With a `loop` schedule and no
+authored slots, `N` falls out of the song, and `dur` on a generated slot is
+ignored:
 
 ```
 N = max(1, round((D - x) / (clip - x)))
 ```
 
-`clip` must be `> x`. The resolved output duration is
-`N * (clip - x) + x`. The plan reports both that duration and `D`. The fade
-chain uses the same start-of-fade rule as `fit-audio`, with this `clip` and
-`x`.
+`clip` must be `> x`. When a song supplied `N`, the plan reports both the
+video duration and that song length. The fade chain uses the same
+start-of-fade rule as `fit-audio`.
 
 `given` and `shuffle` produce one slot per pool item. `fixed-clip` with
 those schedules is legal when that count equals `N` from the formula above.
@@ -714,13 +733,16 @@ Family `scan` skips the `reveal` check and still passes every other rule.
 
 The engine renders each slot's canvas through the motion filter for
 `clipDur` seconds, joins the clips with `xfade` of type `fade` at the
-resolved offsets, and muxes the soundtrack.
+resolved offsets, and muxes the soundtrack when the document has one.
+A document with no soundtrack writes the video stream only.
 
-Video defaults are the Output defaults. Audio is AAC at `audioBitrate`. The
-output stream is trimmed to the shorter of the resolved video duration and
-the song (`-shortest` in ffmpeg terms). `+faststart` is set on the file.
+Video defaults are the Output defaults. Audio is AAC at `audioBitrate` when
+a soundtrack is muxed. That output is trimmed to the shorter of the resolved
+video duration and the song (`-shortest` in ffmpeg terms). `+faststart` is
+set on the file.
 
-The plan, before any encode, reports the song duration, each slot's source,
+The plan, before any encode, reports the song duration when there is a song,
+each slot's source,
 mode or `basedOn`, family, clip start, clip duration, opaque range, `fill`,
 the far zoom, and each join's start and midpoint. That report is the
 resolved timeline. It is not written back into the document.

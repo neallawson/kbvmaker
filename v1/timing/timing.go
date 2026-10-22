@@ -42,9 +42,13 @@ func fitAudio(d *doc.Document, slots []doc.Slot, song float64) ([]float64, []flo
 		return nil, nil, err
 	}
 	n := len(slots)
+	clock := "song"
+	if d.Audio == "" {
+		clock = "film"
+	}
 	if n == 1 {
 		if slots[0].Dur != nil && math.Abs(*slots[0].Dur-song) > 1e-6 {
-			return nil, nil, rule.E(1, "bad-time", "the only picture runs for the whole song")
+			return nil, nil, rule.E(1, "bad-time", "the only picture runs for the whole %s", clock)
 		}
 		return []float64{song}, nil, nil
 	}
@@ -63,7 +67,7 @@ func fitAudio(d *doc.Document, slots []doc.Slot, song float64) ([]float64, []flo
 		lastPin = i + 1
 	}
 	if pinned == n {
-		return nil, nil, rule.E(n, "bad-time", "leave one picture sharing the song")
+		return nil, nil, rule.E(n, "bad-time", "leave one picture sharing the %s", clock)
 	}
 	shared := (song + float64(n-1)*x - sumP) / float64(n-pinned)
 	if shared <= x {
@@ -101,8 +105,18 @@ func equal(d *doc.Document, slots []doc.Slot, song, clip float64, fromSong bool)
 		return nil, nil, rule.E(0, "bad-number", "clip %v is not longer than the join %v", clip, x)
 	}
 	durs := make([]float64, n)
-	for i := range durs {
-		durs[i] = clip
+	for i, s := range slots {
+		dur := clip
+		if !fromSong && s.Dur != nil {
+			dur = *s.Dur
+		}
+		if n > 1 && dur <= x {
+			return nil, nil, rule.E(i+1, "bad-time", "picture length %v is not longer than the dissolve %v", dur, x)
+		}
+		if dur <= 0 {
+			return nil, nil, rule.E(i+1, "bad-time", "dur %v", dur)
+		}
+		durs[i] = dur
 	}
 	joins := make([]float64, n-1)
 	for i := range joins {

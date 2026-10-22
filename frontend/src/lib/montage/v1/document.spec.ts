@@ -3,7 +3,11 @@ import type { MontageFile } from './client';
 import {
 	addPictures,
 	applyLook,
+	canPlan,
+	clipFromFilm,
+	clearAudio,
 	dragLayout,
+	filmFromClips,
 	settledLayout,
 	dropIndex,
 	gripHit,
@@ -14,13 +18,21 @@ import {
 	resizePictures,
 	scoreBlocks,
 	scoreJoins,
+	lockFilm,
 	setAudio,
 	setDur,
+	setFilmLength,
+	setTimeEach,
+	unlockFilm,
 	shuffleMoves,
 	shuffleSlots,
 	songClock,
 	sortByName
 } from './document';
+
+function songFilm(): MontageFile {
+	return { ...newProject(), audio: 'song.mp3', timing: { policy: 'fit-audio' } };
+}
 
 describe('score and song length', () => {
 	it('gives each new picture an equal block until a plan exists', () => {
@@ -58,7 +70,7 @@ describe('score and song length', () => {
 describe('project edits', () => {
 	it('starts from Classic with no pictures', () => {
 		const file = newProject();
-		expect(file.timing).toEqual({ policy: 'fit-audio' });
+		expect(file.timing).toEqual({ policy: 'fixed-clip', clip: 5 });
 		expect(file.defaults?.join?.duration).toBe(1);
 		expect(file.canvas?.backdrop).toEqual({ kind: 'color', color: '#000000' });
 		expect(file.slots).toEqual([]);
@@ -201,41 +213,41 @@ describe('project edits', () => {
 	});
 
 	it('pins the two pictures around a divider and leaves the rest sharing', () => {
-		const file = addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg']);
+		const file = addPictures(songFilm(), ['a.jpg', 'b.jpg', 'c.jpg']);
 		const next = resizePictures(file, [8, 8, 8], 0, 2, 1);
 		expect(next.timing).toEqual({ policy: 'fit-audio' });
 		expect(next.slots?.map((slot) => slot.dur)).toEqual([10, 6, undefined]);
 	});
 
 	it('pins one of two pictures so the other keeps absorbing the song', () => {
-		const file = addPictures(newProject(), ['a.jpg', 'b.jpg']);
+		const file = addPictures(songFilm(), ['a.jpg', 'b.jpg']);
 		const next = resizePictures(file, [10.5, 10.5], 0, 1, 1);
 		expect(next.slots?.map((slot) => slot.dur)).toEqual([11.5, undefined]);
 	});
 
 	it('keeps already pinned neighbors and the picture that still shares', () => {
-		let file = addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg']);
+		let file = addPictures(songFilm(), ['a.jpg', 'b.jpg', 'c.jpg']);
 		file = setDur(setDur(file, 0, 10), 1, 8);
 		const next = resizePictures(file, [10, 8, 6], 0, 1, 1);
 		expect(next.slots?.map((slot) => slot.dur)).toEqual([11, 7, undefined]);
 	});
 
 	it('lets the unpinned picture on the left absorb the divider drag', () => {
-		let file = addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg']);
+		let file = addPictures(songFilm(), ['a.jpg', 'b.jpg', 'c.jpg']);
 		file = setDur(setDur(file, 1, 10), 2, 6);
 		const next = resizePictures(file, [6, 10, 6], 0, 1, 1);
 		expect(next.slots?.map((slot) => slot.dur)).toEqual([undefined, 9, 6]);
 	});
 
 	it('lets the only unpinned picture absorb the divider drag', () => {
-		let file = addPictures(newProject(), ['a.jpg', 'b.jpg', 'c.jpg']);
+		let file = addPictures(songFilm(), ['a.jpg', 'b.jpg', 'c.jpg']);
 		file = setDur(setDur(file, 0, 10), 1, 6);
 		const next = resizePictures(file, [10, 6, 6], 1, 1, 1);
 		expect(next.slots?.map((slot) => slot.dur)).toEqual([10, 7, undefined]);
 	});
 
 	it('stops the divider when a picture would be as short as the dissolve', () => {
-		const file = addPictures(newProject(), ['a.jpg', 'b.jpg']);
+		const file = addPictures(songFilm(), ['a.jpg', 'b.jpg']);
 		const next = resizePictures(file, [10, 10], 0, 100, 1);
 		expect(next.slots?.[0].dur).toBeCloseTo(18.999, 3);
 		expect(next.slots?.[1].dur).toBeUndefined();
@@ -251,7 +263,7 @@ describe('project edits', () => {
 	it('unpins the last picture when a fit-audio look would pin every one', () => {
 		let file = applyLook(addPictures(newProject(), ['a.jpg', 'b.jpg']), 'quick-slides');
 		file = resizePictures(file, [5, 5], 0, 1, 0.5);
-		file = applyLook(file, 'classic');
+		file = applyLook({ ...file, audio: 'song.mp3' }, 'classic');
 		expect(file.timing).toEqual({ policy: 'fit-audio' });
 		expect(file.slots?.[0].dur).toBe(6);
 		expect(file.slots?.[1].dur).toBeUndefined();
@@ -268,5 +280,65 @@ describe('project edits', () => {
 		expect(file.audio).toBe('song.mp3');
 		expect(file.slots?.[0].src).toBe('a.jpg');
 		expect(file.output?.file).toBe('out.mp4');
+	});
+
+	it('turns a typed film length and a time for each into the same clock', () => {
+		const join = 1;
+		const count = 10;
+		expect(clipFromFilm(count, 41, join)).toBe(5);
+		expect(filmFromClips(count, Array(count).fill(5), join)).toBe(41);
+		let file = setTimeEach(addPictures(newProject(), ['a.jpg', 'b.jpg']), 8);
+		expect(file.timing).toEqual({ policy: 'fixed-clip', clip: 8 });
+		file = setFilmLength(file, 17);
+		expect(file.timing).toEqual({ policy: 'fixed-clip', clip: 9 });
+		file = setDur(file, 0, 12);
+		expect(setFilmLength(file, 30)).toBe(file);
+	});
+
+	it('locks the finished length and keeps one picture sharing it', () => {
+		let file = setDur(setDur(addPictures(newProject(), ['a.jpg', 'b.jpg']), 0, 6), 1, 6);
+		file = lockFilm(file, 11);
+		expect(file.timing).toEqual({ policy: 'fit-audio', duration: 11 });
+		expect(file.slots?.[0].dur).toBe(6);
+		expect(file.slots?.[1].dur).toBeUndefined();
+		file = unlockFilm(file, 5);
+		expect(file.timing).toEqual({ policy: 'fixed-clip', clip: 5 });
+		expect(file.slots?.[0].dur).toBe(6);
+	});
+
+	it('lets a Classic soundtrack replace a typed film length and keeps Quick slides', () => {
+		let file = lockFilm(addPictures(newProject(), ['a.jpg']), 41);
+		file = setDur(file, 0, 41);
+		file = setAudio(file, 'song.mp3', 'classic');
+		expect(file.audio).toBe('song.mp3');
+		expect(file.timing).toEqual({ policy: 'fit-audio' });
+		expect(file.slots?.[0].dur).toBe(41);
+		file = clearAudio(file, 41);
+		expect(file.audio).toBeUndefined();
+		expect(file.timing).toEqual({ policy: 'fixed-clip', clip: 41 });
+
+		const slides = setAudio(applyLook(newProject(), 'quick-slides'), 'song.mp3', 'quick-slides');
+		expect(slides.timing).toEqual({ policy: 'fixed-clip', clip: 5 });
+		expect(clearAudio(slides, 9).timing).toEqual({ policy: 'fixed-clip', clip: 5 });
+		expect(clearAudio(slides, 9).audio).toBeUndefined();
+	});
+
+	it('keeps an opened picture clock when a song is added', () => {
+		const file = setAudio(setTimeEach(newProject(), 8), 'song.mp3');
+		expect(file.timing).toEqual({ policy: 'fixed-clip', clip: 8 });
+		expect(canPlan({ ...file, slots: [{ src: 'a.jpg' }] })).toBe(true);
+		expect(canPlan(newProject())).toBe(false);
+		expect(canPlan(lockFilm(addPictures(newProject(), ['a.jpg']), 12))).toBe(true);
+	});
+
+	it('starts Classic without a song at five seconds and keeps a pin', () => {
+		let file = setDur(addPictures(newProject(), ['a.jpg', 'b.jpg']), 0, 9);
+		file = applyLook(file, 'classic');
+		expect(file.timing).toEqual({ policy: 'fixed-clip', clip: 5 });
+		expect(file.slots?.[0].dur).toBe(9);
+		expect(file.slots?.[1].dur).toBeUndefined();
+		file = applyLook({ ...file, audio: 'song.mp3' }, 'photo-film');
+		expect(file.timing).toEqual({ policy: 'fit-audio' });
+		expect(file.slots?.[0].dur).toBe(9);
 	});
 });

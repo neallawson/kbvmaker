@@ -29,21 +29,24 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 	if err := requireFilters(ctx, probe); err != nil {
 		return nil, err
 	}
-	audio := doc.ResolvePath(d.Dir, d.Audio)
 	var gaps []mediaGap
-	if err := exists(audio); err != nil {
-		gaps = append(gaps, mediaGap{msg: fmt.Sprintf("Missing soundtrack: %s", d.Audio)})
-	}
 	song := 0.0
 	var err error
-	if len(gaps) == 0 {
-		song, err = probe.Duration(ctx, audio)
-		if err != nil {
-			return nil, rule.E(0, "missing-media", "Cannot read soundtrack: %s", d.Audio)
+	if d.Audio != "" {
+		audio := doc.ResolvePath(d.Dir, d.Audio)
+		if err := exists(audio); err != nil {
+			gaps = append(gaps, mediaGap{msg: fmt.Sprintf("Missing soundtrack: %s", d.Audio)})
+		} else {
+			song, err = probe.Duration(ctx, audio)
+			if err != nil {
+				return nil, rule.E(0, "missing-media", "Cannot read soundtrack: %s", d.Audio)
+			}
+			if song <= 0 {
+				return nil, rule.E(0, "bad-number", "song duration %v", song)
+			}
 		}
-		if song <= 0 {
-			return nil, rule.E(0, "bad-number", "song duration %v", song)
-		}
+	} else if d.Timing.Policy == "fit-audio" && d.Timing.HasDuration {
+		song = d.Timing.Duration
 	}
 	slots := d.Slots
 	if len(slots) == 0 && len(gaps) > 0 {

@@ -541,7 +541,7 @@ func (t *Timing) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := allow(raw, "policy", "clip", "count"); err != nil {
+	if err := allow(raw, "policy", "clip", "count", "duration"); err != nil {
 		return err
 	}
 	if _, ok := raw["policy"]; !ok {
@@ -557,6 +557,13 @@ func (t *Timing) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		t.HasClip = true
+	}
+	if v, ok := raw["duration"]; ok {
+		t.Duration, err = num(v)
+		if err != nil {
+			return err
+		}
+		t.HasDuration = true
 	}
 	if v, ok := raw["count"]; ok {
 		n, err := num(v)
@@ -576,6 +583,10 @@ func (t *Timing) UnmarshalJSON(b []byte) error {
 func (t Timing) MarshalJSON() ([]byte, error) {
 	m := map[string]any{"policy": t.Policy}
 	order := []string{"policy"}
+	if t.HasDuration {
+		m["duration"] = t.Duration
+		order = append(order, "duration")
+	}
 	if t.HasClip {
 		m["clip"] = t.Clip
 		order = append(order, "clip")

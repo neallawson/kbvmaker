@@ -79,9 +79,11 @@ describe('Editor', () => {
 		expect(buttons?.textContent).toContain('Unsaved changes');
 		expect(screen.getByRole('button', { name: 'Classic' }).getAttribute('aria-pressed')).toBe('true');
 		const title = screen.getByRole('heading', { level: 1 });
-		for (const heading of [title, screen.getByRole('heading', { name: 'Soundtrack' }), screen.getByRole('heading', { name: 'Look' }), screen.getByRole('heading', { name: 'Pictures' }), screen.getByRole('heading', { name: 'Render' })]) {
+		for (const heading of [title, screen.getByRole('heading', { name: 'Look' }), screen.getByRole('heading', { name: 'Pictures' }), screen.getByRole('heading', { name: 'Render' })]) {
 			expect(heading.className).not.toContain('border-b');
 		}
+		expect(screen.getByRole('tab', { name: 'Soundtrack', selected: true })).toBeTruthy();
+		expect(screen.getByRole('tab', { name: 'Soundtrack' }).closest('section')?.className).toContain('border-b');
 		expect(title.closest('section')?.className).toContain('border-b');
 		expect(screen.getByRole('heading', { name: 'Pictures' }).closest('section')?.className).toContain('border-b');
 		expect(screen.getByRole('heading', { name: 'Render' }).closest('section')?.className).not.toContain('border-b');
@@ -107,7 +109,7 @@ describe('Editor', () => {
 		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), `/films/${name}`);
 		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
 		const row = await screen.findByRole('listitem');
-		const label = within(row).getByRole('button', { name: `1. ${name}` });
+		const label = within(row).getByRole('button', { name: new RegExp(`^1\\. ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) });
 		expect(label.className).toContain('min-w-0');
 		expect(label.querySelector('span')?.className).toContain('break-all');
 		expect(screen.getByText('/films/piece.montage.json').className).toContain('break-all');
@@ -182,7 +184,7 @@ describe('Editor', () => {
 			expect(mark.querySelector('img')?.getAttribute('src')).toBe('data:image/jpeg;base64,thumb');
 		});
 		const row = screen.getByRole('listitem');
-		expect(within(row).getByRole('button', { name: '1. a.jpg' }).querySelector('img')?.getAttribute('src')).toBe(
+		expect(within(row).getByRole('button', { name: /^1\. a\.jpg/ }).querySelector('img')?.getAttribute('src')).toBe(
 			'data:image/jpeg;base64,thumb'
 		);
 	});
@@ -196,6 +198,103 @@ describe('Editor', () => {
 		await user.type(screen.getByRole('textbox', { name: 'Song file' }), '/films/song.mp3');
 		await user.click(screen.getByRole('button', { name: 'Add soundtrack' }));
 		expect(await screen.findByText('3:42 · 222s')).toBeTruthy();
+		expect(screen.queryByRole('textbox', { name: 'Time for each picture' })).toBeNull();
+	});
+
+	it('shows the finished length and the time for each picture without a song', async () => {
+		const user = userEvent.setup();
+		const api = client();
+		render(Editor, { client: api.client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		expect(screen.queryByRole('textbox', { name: 'Time for each picture' })).toBeNull();
+
+		await user.click(screen.getByRole('tab', { name: 'No Soundtrack' }));
+		expect(screen.getByText('0:05 · 5s')).toBeTruthy();
+		const each = screen.getByRole('textbox', { name: 'Time for each picture' }) as HTMLInputElement;
+		expect(each.value).toBe('5');
+		expect(each.disabled).toBe(false);
+
+		await user.clear(each);
+		await user.type(each, '8');
+		await user.tab();
+		expect(screen.getByText('0:08 · 8s')).toBeTruthy();
+
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/b.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		expect(await screen.findByText('0:20 · 20s')).toBeTruthy();
+		expect((screen.getByRole('textbox', { name: 'Time for each picture' }) as HTMLInputElement).value).toBe('8');
+		await waitFor(() => {
+			expect(api.plans.at(-1)?.timing).toEqual({ policy: 'fixed-clip', clip: 8 });
+		});
+	});
+
+	it('gives one picture its own time without a song and leaves the other at the pace', async () => {
+		const user = userEvent.setup();
+		const api = client();
+		render(Editor, { client: api.client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/b.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+
+		const length = (await screen.findByRole('textbox', { name: 'Length in seconds' })) as HTMLInputElement;
+		expect(length.disabled).toBe(false);
+		await user.clear(length);
+		await user.type(length, '40');
+		await user.tab();
+		await screen.findByRole('button', { name: 'Remove custom time' });
+		await waitFor(() => {
+			const last = api.plans.at(-1);
+			expect(last?.audio).toBeUndefined();
+			expect(last?.timing).toEqual({ policy: 'fixed-clip', clip: 5 });
+			expect(last?.slots?.[0].dur).toBe(40);
+			expect(last?.slots?.[1].dur).toBeUndefined();
+		});
+		await user.click(screen.getByRole('tab', { name: 'No Soundtrack' }));
+		expect(screen.getByText('Film length')).toBeTruthy();
+		expect((screen.getByRole('textbox', { name: 'Time for each picture' }) as HTMLInputElement).value).toBe('5');
+	});
+
+	it('lets the song take the clock from Classic and keeps Quick slides', async () => {
+		const user = userEvent.setup();
+		const api = client();
+		render(Editor, { client: api.client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Song file' }), '/films/song.mp3');
+		await user.click(screen.getByRole('button', { name: 'Add soundtrack' }));
+		await waitFor(() => {
+			expect(api.plans.at(-1)?.timing).toEqual({ policy: 'fit-audio' });
+			expect(api.plans.at(-1)?.audio).toBe('/films/song.mp3');
+		});
+
+		await screen.findByText('0:20');
+		await user.click(screen.getByRole('tab', { name: 'No Soundtrack' }));
+		await waitFor(() => {
+			const last = api.plans.at(-1);
+			expect(last?.audio).toBeUndefined();
+			expect(last?.timing).toEqual({ policy: 'fixed-clip', clip: 10 });
+		});
+		expect(screen.getByRole('tab', { name: 'No Soundtrack', selected: true })).toBeTruthy();
+
+		await user.click(screen.getByRole('button', { name: 'Quick slides' }));
+		await user.click(screen.getByRole('tab', { name: 'Soundtrack' }));
+		await user.type(screen.getByRole('textbox', { name: 'Song file' }), '/films/song.mp3');
+		await user.click(screen.getByRole('button', { name: 'Add soundtrack' }));
+		await waitFor(() => {
+			expect(api.plans.at(-1)?.timing).toEqual({ policy: 'fixed-clip', clip: 5 });
+		});
+		expect((await screen.findByRole('textbox', { name: 'Length in seconds' })) as HTMLInputElement).toHaveProperty(
+			'disabled',
+			true
+		);
 	});
 
 	it('does not ask for a file until Save', async () => {
@@ -239,8 +338,6 @@ describe('Editor', () => {
 		expect(await within(timeline).findByText('0:00')).toBeTruthy();
 		const asides = document.querySelectorAll('[data-aside]');
 		expect(asides).toHaveLength(2);
-		expect(asides[0].parentElement?.className).toBe(asides[1].parentElement?.className);
-		expect(asides[0].parentElement?.className).toContain('max-w-6xl');
 		expect(within(timeline).getByText('0:20')).toBeTruthy();
 		expect(timeline.querySelectorAll('[data-join]')).toHaveLength(1);
 		const score = await within(timeline).findByRole('button', { name: '2. b.jpg' });
@@ -436,7 +533,7 @@ describe('Editor', () => {
 		expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('Missing picture 1: a.jpg'));
 		await waitFor(() => expect(thumbs).toBeGreaterThan(0));
 		const thumbsBefore = thumbs;
-		await user.click(screen.getByRole('button', { name: 'Re-scan Images/Audio' }));
+		await user.click(screen.getByRole('button', { name: 'Re-scan Pictures/Audio' }));
 		await waitFor(() => expect(plans).toBe(2));
 		await waitFor(() => expect(thumbs).toBeGreaterThan(thumbsBefore));
 		await waitFor(() => expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).disabled).toBe(false));
@@ -459,18 +556,18 @@ describe('Editor', () => {
 
 		const timeline = screen.getByRole('group', { name: 'Timeline' });
 		stubTrack();
+		await within(timeline).findByRole('button', { name: 'Change the lengths beside pictures 1 and 2' });
 		const moving = within(timeline).getByRole('button', { name: '2. b.jpg' });
 		fireEvent.pointerDown(moving, { clientX: 150, clientY: 8, button: 0, pointerId: 1 });
 		fireEvent.pointerMove(window, { clientX: 10, clientY: 8, button: 0, pointerId: 1 });
 		fireEvent.pointerUp(window, { clientX: 10, clientY: 8, button: 0, pointerId: 1 });
 		await tick();
 
-		expect(within(timeline).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
-			'1. b.jpg',
-			'2. a.jpg'
-		]);
+		expect(pictureLabels(timeline)).toEqual(['1. b.jpg', '2. a.jpg']);
 		expect(screen.getByText('Unsaved changes')).toBeTruthy();
-		expect(api.plans).toEqual([]);
+		await waitFor(() => {
+			expect(api.plans.at(-1)?.slots?.map((slot) => slot.src)).toEqual(['/films/b.jpg', '/films/a.jpg']);
+		});
 	});
 
 	it('lifts a picture and opens a gap while it is dragged', async () => {
@@ -485,6 +582,7 @@ describe('Editor', () => {
 
 		const timeline = screen.getByRole('group', { name: 'Timeline' });
 		stubTrack();
+		await within(timeline).findByRole('button', { name: 'Change the lengths beside pictures 1 and 2' });
 		const moving = within(timeline).getByRole('button', { name: '2. b.jpg' });
 		fireEvent.pointerDown(moving, { clientX: 150, clientY: 8, button: 0 });
 		fireEvent.pointerMove(window, { clientX: 10, clientY: 8, button: 0 });
@@ -494,15 +592,12 @@ describe('Editor', () => {
 		const held = document.querySelector('[data-lift]') as HTMLElement;
 		expect(held.className).toContain('shadow-');
 		expect(held.textContent).toContain('2');
-		expect(parseFloat(within(timeline).getByRole('button', { name: '1. a.jpg' }).style.left)).toBeCloseTo(50);
+		expect(parseFloat(within(timeline).getByRole('button', { name: '1. a.jpg' }).style.left)).toBeCloseTo(45);
 		expect(within(timeline).queryByRole('button', { name: '2. b.jpg' })).toBeNull();
 		fireEvent.pointerUp(window, { clientX: 10, clientY: 8, button: 0 });
 		await tick();
 		expect(document.querySelector('[data-lift]')).toBeNull();
-		expect(within(timeline).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
-			'1. b.jpg',
-			'2. a.jpg'
-		]);
+		expect(pictureLabels(timeline)).toEqual(['1. b.jpg', '2. a.jpg']);
 	});
 
 	it('selects a picture when the press does not travel', async () => {
@@ -597,6 +692,13 @@ describe('Editor', () => {
 		expect(gripRight).toBeLessThanOrEqual(pictureLeft + 0.01);
 	});
 });
+
+function pictureLabels(timeline: HTMLElement): (string | null)[] {
+	return within(timeline)
+		.getAllByRole('button')
+		.map((button) => button.getAttribute('aria-label'))
+		.filter((label) => /^\d+\. /.test(label ?? ''));
+}
 
 function stubTrack() {
 	const track = document.querySelector('[data-timeline]') as HTMLElement;

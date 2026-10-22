@@ -53,8 +53,8 @@ func (o Options) norm() Options {
 	return o
 }
 
-// Commands is the render plan: a filter check, a duration probe, canvases,
-// clips, joins, and the audio mux.
+// Commands is the render plan: a filter check, a soundtrack probe when the
+// film has one, canvases, clips, joins, and the mux.
 func Commands(p *model.Plan, opt Options) ([]Command, error) {
 	opt = opt.norm()
 	if len(p.Slots) == 0 {
@@ -62,9 +62,11 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 	}
 	var cmds []Command
 	cmds = append(cmds, Command{Stage: "filters", Argv: []string{opt.FFmpeg, "-hide_banner", "-filters"}})
-	cmds = append(cmds, Command{Stage: "probe", Argv: []string{
-		opt.FFProbe, "-v", "error", "-show_entries", "format=duration", "-of", "json", p.Audio,
-	}})
+	if p.Audio != "" {
+		cmds = append(cmds, Command{Stage: "probe", Argv: []string{
+			opt.FFProbe, "-v", "error", "-show_entries", "format=duration", "-of", "json", p.Audio,
+		}})
+	}
 	canvasOf := map[string]string{}
 	n := 0
 	for _, s := range p.Slots {
@@ -121,13 +123,17 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 		cmds = append(cmds, joinCmds...)
 		video = final.path
 	}
-	cmds = append(cmds, Command{Stage: "mux", Argv: append(opt.ffmpeg(),
-		"-i", video, "-i", p.Audio,
-		"-map", "0:v:0", "-map", "1:a:0",
-		"-c:v", "copy", "-c:a", p.Output.AudioCodec, "-b:a", strconv.Itoa(p.Output.AudioBitrate),
-		"-shortest", "-movflags", "+faststart",
-		p.OutputFile,
-	)})
+	mux := append(opt.ffmpeg(), "-i", video)
+	if p.Audio != "" {
+		mux = append(mux, "-i", p.Audio,
+			"-map", "0:v:0", "-map", "1:a:0",
+			"-c:v", "copy", "-c:a", p.Output.AudioCodec, "-b:a", strconv.Itoa(p.Output.AudioBitrate),
+			"-shortest")
+	} else {
+		mux = append(mux, "-map", "0:v:0", "-c:v", "copy", "-an")
+	}
+	mux = append(mux, "-movflags", "+faststart", p.OutputFile)
+	cmds = append(cmds, Command{Stage: "mux", Argv: mux})
 	return cmds, nil
 }
 

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { Button } from '#lib/components/ui/button';
+	import { Card, CardContent } from '#lib/components/ui/card';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs';
 	import type { Host } from '#lib/platform/host';
 	import { RuleError, type Client, type MontageFile, type Plan } from './client';
 	import {
@@ -8,14 +10,19 @@
 		applyLook,
 		baseName,
 		blocksFromLengths,
+		canPlan,
+		clipFromFilm,
+		clearAudio,
 		dragLayout,
 		dropIndex,
 		gripHit,
 		settledLayout,
+		joinSeconds,
 		moveChoices,
 		moveSlot,
 		newProject,
 		mediaPath,
+		outputLength,
 		projectDir,
 		relativize,
 		removeSlot,
@@ -27,6 +34,7 @@
 		scoreJoins,
 		secondsLabel,
 		setAudio,
+		setTimeEach,
 		songClock,
 		setDur,
 		setMode,
@@ -43,6 +51,8 @@
 	let pathDraft = $state('');
 	let doc = $state<MontageFile | null>(null);
 	let look = $state<LookId | null>(null);
+	/** clockTab is the open clock. Soundtrack is where a new project starts. */
+	let clockTab = $state<'soundtrack' | 'silent'>('soundtrack');
 	let selected = $state(0);
 	let dirty = $state(false);
 	let plan = $state<Plan | null>(null);
@@ -57,6 +67,7 @@
 	let songSeconds = $state<number | null>(null);
 	let pictureDraft = $state('');
 	let lengthDraft = $state<string | null>(null);
+	let eachDraft = $state<string | null>(null);
 	let thumbs = $state<Record<string, string>>({});
 	let trackEl = $state<HTMLDivElement | null>(null);
 	let trackWidth = $state(0);
@@ -92,7 +103,7 @@
 		const current = doc;
 		const dir = projectDir(filePath);
 		void scan;
-		if (!current?.audio || !current.slots?.length) {
+		if (!current || !canPlan(current)) {
 			plan = null;
 			return;
 		}
@@ -119,7 +130,7 @@
 						gripCommit = false;
 					}
 				}
-				if (next.song != null) {
+				if (current.audio && next.song != null) {
 					songSeconds = next.song;
 				}
 				if (errorKind === 'plan') {
@@ -225,6 +236,7 @@
 		doc = next;
 		dirty = true;
 		lengthDraft = null;
+		eachDraft = null;
 		if (!holdPreview) {
 			preview = null;
 			gripCommit = false;
@@ -236,6 +248,7 @@
 		filePath = path;
 		doc = newProject();
 		look = 'classic';
+		clockTab = 'soundtrack';
 		selected = 0;
 		dirty = true;
 		clearError();
@@ -243,6 +256,7 @@
 		reorderHold = null;
 		lift = null;
 		songSeconds = null;
+		eachDraft = null;
 	}
 
 	async function newProjectFile() {
@@ -267,7 +281,9 @@
 			dirty = false;
 			clearError();
 			lengthDraft = null;
+			eachDraft = null;
 			songSeconds = null;
+			clockTab = doc.audio ? 'soundtrack' : 'silent';
 			if (doc.audio) {
 				void measureSong(doc.audio);
 			}
@@ -316,8 +332,56 @@
 		if (!chosen || !doc) {
 			return;
 		}
-		edit(setAudio(doc, chosen));
+		edit(setAudio(doc, chosen, look));
+		clockTab = 'soundtrack';
 		await measureSong(chosen);
+	}
+
+	function showSoundtrack() {
+		clockTab = 'soundtrack';
+	}
+
+	function selectClock(next: string) {
+		if (next === 'silent') showSilent();
+		else showSoundtrack();
+	}
+
+	function showSilent() {
+		if (!doc) {
+			return;
+		}
+		if (doc.audio) {
+			edit(clearAudio(doc, paceKeepingPictures(doc)));
+			songDraft = '';
+			songSeconds = null;
+		}
+		clockTab = 'silent';
+	}
+
+	function paceKeepingPictures(file: MontageFile): number {
+		const slots = file.slots ?? [];
+		const index = slots.findIndex((slot) => slot.dur == null);
+		const resolved = plan?.slots[index >= 0 ? index : 0]?.clipDur;
+		if (resolved != null && resolved > 0) {
+			return resolved;
+		}
+		if (songSeconds != null && songSeconds > 0) {
+			return clipFromFilm(Math.max(slots.length, 1), songSeconds, joinSeconds(file));
+		}
+		return file.timing?.clip ?? 5;
+	}
+
+	function commitTimeEach(raw: string) {
+		if (!doc) {
+			return;
+		}
+		const n = Number(raw.trim());
+		if (!Number.isFinite(n) || n <= 0) {
+			showError('Enter a time for each picture');
+			eachDraft = null;
+			return;
+		}
+		edit(setTimeEach(doc, n));
 	}
 
 	async function addPicture(path = pictureDraft) {
@@ -346,7 +410,7 @@
 		}
 		const text = raw.trim();
 		if (!text) {
-			if ((doc.timing?.policy ?? 'fit-audio') === 'fit-audio') {
+			if (policyOf(doc) === 'fit-audio' || (policyOf(doc) === 'fixed-clip' && !doc.audio && !uniformClip(doc))) {
 				edit(setDur(doc, selected, null));
 			}
 			return;
@@ -354,6 +418,10 @@
 		const n = Number(text);
 		if (!Number.isFinite(n) || n <= 0) {
 			showError('Enter a length in seconds', selected + 1);
+			return;
+		}
+		if (!doc.audio && policyOf(doc) === 'fixed-clip' && (doc.slots?.length ?? 0) < 2) {
+			edit(setTimeEach(doc, n));
 			return;
 		}
 		const resolved = plan?.slots[selected]?.clipDur;
@@ -516,12 +584,59 @@
 		return file.timing?.policy ?? 'fit-audio';
 	}
 
-	function lengthLocked(file: MontageFile): boolean {
-		const policy = policyOf(file);
-		if (policy === 'fixed-clip') {
+	function uniformClip(file: MontageFile): boolean {
+		if (policyOf(file) !== 'fixed-clip') {
+			return false;
+		}
+		if (file.audio || look === 'quick-slides') {
 			return true;
 		}
-		return policy === 'fit-audio' && (file.slots?.length ?? 0) < 2;
+		return look == null && (file.defaults?.hold ?? 0) === 0;
+	}
+
+	function lengthLocked(file: MontageFile): boolean {
+		if (uniformClip(file)) {
+			return true;
+		}
+		return policyOf(file) === 'fit-audio' && (file.slots?.length ?? 0) < 2;
+	}
+
+	function timeEachEditable(file: MontageFile): boolean {
+		if (file.audio || uniformClip(file)) {
+			return false;
+		}
+		const policy = policyOf(file);
+		return policy === 'fixed-clip' || policy === 'fit-audio';
+	}
+
+	function filmReadout(): string {
+		if (!doc) {
+			return '';
+		}
+		const seconds = plan && (doc.slots?.length ?? 0) > 0 ? plan.duration : outputLength(doc);
+		return songClock(seconds);
+	}
+
+	function timeEachValue(): string {
+		if (eachDraft != null) {
+			return eachDraft;
+		}
+		if (!doc) {
+			return '';
+		}
+		if (policyOf(doc) === 'fixed-clip' && doc.timing?.clip != null) {
+			return secondsLabel(doc.timing.clip);
+		}
+		const slots = doc.slots ?? [];
+		const index = slots.findIndex((slot) => slot.dur == null);
+		const fromPlan = plan?.slots[index >= 0 ? index : 0]?.clipDur;
+		if (fromPlan != null && (policyOf(doc) === 'fit-audio' || index >= 0)) {
+			return secondsLabel(fromPlan);
+		}
+		if (doc.timing?.duration != null) {
+			return secondsLabel(clipFromFilm(Math.max(slots.length, 1), doc.timing.duration, joinSeconds(doc)));
+		}
+		return '';
 	}
 
 	function choose(index: number) {
@@ -727,27 +842,63 @@
 
 	{#if doc}
 		<section class="flex flex-col gap-2 {rule}">
-			<h2 class="font-medium">Soundtrack</h2>
-			<div class={cluster}>
-				<div class="col-span-2 flex flex-wrap gap-2">
-					{#if !host.pickAudio}
-						<input
-							class="border-input bg-background h-9 w-96 max-w-full min-w-0 rounded-md border px-3"
-							aria-label="Song file"
-							bind:value={songDraft}
-						/>
-					{/if}
-					<Button variant="outline" onclick={() => addSong()}>
-						{doc.audio ? 'Change soundtrack' : 'Add soundtrack'}
-					</Button>
-				</div>
-				{#if doc.audio}
-					<p class="min-w-0 text-sm break-all">{baseName(doc.audio)}</p>
-					<p class="w-40 text-sm whitespace-nowrap tabular-nums" data-aside>
-						{songSeconds != null ? songClock(songSeconds) : ''}
-					</p>
-				{/if}
-			</div>
+			<Tabs class="w-[400px]" bind:value={clockTab} onValueChange={selectClock}>
+				<TabsList aria-label="Clock">
+					<TabsTrigger value="soundtrack">Soundtrack</TabsTrigger>
+					<TabsTrigger value="silent">No Soundtrack</TabsTrigger>
+				</TabsList>
+				<TabsContent value="soundtrack">
+					<Card>
+						<CardContent>
+							<div class="flex flex-wrap gap-2">
+								{#if !host.pickAudio}
+									<input
+										class="border-input bg-background h-9 w-full min-w-0 rounded-md border px-3"
+										aria-label="Song file"
+										bind:value={songDraft}
+									/>
+								{/if}
+								<Button variant="outline" onclick={() => addSong()}>
+									{doc.audio ? 'Change soundtrack' : 'Add soundtrack'}
+								</Button>
+							</div>
+							{#if doc.audio}
+								<div class="flex flex-wrap items-baseline justify-between gap-4">
+									<p class="min-w-0 text-sm break-all">{baseName(doc.audio)}</p>
+									<p class="w-40 text-sm whitespace-nowrap tabular-nums" data-aside>
+										{songSeconds != null ? songClock(songSeconds) : ''}
+									</p>
+								</div>
+							{/if}
+						</CardContent>
+					</Card>
+				</TabsContent>
+				<TabsContent value="silent">
+					<Card>
+						<CardContent>
+							<div class="flex flex-wrap items-end gap-6">
+								<p class="flex flex-col gap-1 text-sm">
+									<span>Film length</span>
+									<span class="tabular-nums">{filmReadout()}</span>
+								</p>
+								{#if policyOf(doc) === 'fixed-clip' || policyOf(doc) === 'fit-audio'}
+									<label class="flex flex-col gap-1 text-sm">
+										Time for each picture
+										<input
+											class="border-input bg-background h-9 w-28 rounded-md border px-3"
+											aria-label="Time for each picture"
+											disabled={!timeEachEditable(doc)}
+											value={timeEachValue()}
+											oninput={(event) => (eachDraft = event.currentTarget.value)}
+											onchange={(event) => commitTimeEach(event.currentTarget.value)}
+										/>
+									</label>
+								{/if}
+							</div>
+						</CardContent>
+					</Card>
+				</TabsContent>
+			</Tabs>
 		</section>
 
 		<section class="flex flex-col gap-2 {rule}">
@@ -782,7 +933,7 @@
 				<Button variant="outline" onclick={() => edit(sortByName(doc!))}>Sort by name</Button>
 				<Button variant="outline" onclick={() => edit(shuffleSlots(doc!))}>Shuffle pictures</Button>
 				<Button variant="outline" onclick={() => edit(shuffleMoves(doc!))}>Shuffle moves</Button>
-				<Button variant="outline" onclick={checkFiles} disabled={working}>Re-scan Images/Audio</Button>
+				<Button variant="outline" onclick={checkFiles} disabled={working}>Re-scan Pictures/Audio</Button>
 			</div>
 
 			<div class="flex flex-col gap-1" role="group" aria-labelledby="timeline-label">
@@ -911,13 +1062,15 @@
 										onchange={(event) => commitLength(event.currentTarget.value)}
 									/>
 								</label>
-								{#if policyOf(doc) === 'fixed-clip'}
+								{#if uniformClip(doc)}
 									<p class="text-muted-foreground text-sm">This look uses the same length for every picture.</p>
 								{:else if policyOf(doc) === 'fit-audio' && (doc.slots?.length ?? 0) < 2}
-									<p class="text-muted-foreground text-sm">This picture runs for the whole song.</p>
+									<p class="text-muted-foreground text-sm">
+										This picture runs for the whole {doc.audio ? 'song' : 'film'}.
+									</p>
 								{/if}
 								<div class="flex flex-wrap items-center gap-2">
-									{#if policyOf(doc) === 'fit-audio' && slot.dur != null}
+									{#if slot.dur != null && (policyOf(doc) === 'fit-audio' || (policyOf(doc) === 'fixed-clip' && !uniformClip(doc)))}
 										<Button variant="outline" onclick={() => edit(setDur(doc!, index, null))}>Remove custom time</Button>
 									{/if}
 									{@render pictureAction('Move up', () => edit(moveSlot(doc!, index, -1)), index === 0, 'up')}

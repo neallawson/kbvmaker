@@ -144,6 +144,34 @@ func TestFFmpegHonorsOutputKnobs(t *testing.T) {
 	}
 }
 
+func TestFFmpegRendersVideoWithoutAudio(t *testing.T) {
+	probe := needFFmpeg(t)
+	dir := smokeMedia(t)
+	body := fmt.Sprintf(`{
+		"montage": 1,
+		"canvas": {"width": 160, "height": 90, "blur": 2},
+		"output": {"width": 80, "height": 48, "fps": 8, "preset": "ultrafast", "crf": 32, "file": "out.mp4"},
+		"defaults": {"hold": 0.1, "join": {"type": "fade", "duration": 0.15}, "zoomSpan": 0.2, "ease": "linear"},
+		"timing": {"policy": "fixed-clip", "clip": 0.4},
+		"slots": [%s, %s]
+	}`, smokeSlot("hold"), smokeSlot("hold"))
+	cmds := compileSmoke(t, probe, dir, body)
+	mux := strings.Join(stageArgv(cmds, "mux"), " ")
+	if !strings.Contains(mux, "-an") || strings.Contains(mux, "tone.wav") {
+		t.Fatalf("mux %s", mux)
+	}
+	if err := v1.Run(context.Background(), dir, cmds); err != nil {
+		t.Fatal(err)
+	}
+	streams := probeFile(t, filepath.Join(dir, "out.mp4"))
+	if streams.video().CodecName == "" {
+		t.Fatal("silent film produced no video stream")
+	}
+	if streams.audio().CodecName != "" {
+		t.Fatalf("audio codec %q", streams.audio().CodecName)
+	}
+}
+
 func smokeBody(canvas, modes, slots, output string) string {
 	if output == "" {
 		output = `"width": 80, "height": 48, "fps": 8, "preset": "ultrafast", "crf": 32, "file": "out.mp4"`

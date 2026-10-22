@@ -48,7 +48,7 @@ export interface MontageFile {
 		zoomSpan?: number;
 		ease?: 'linear';
 	};
-	timing?: { policy: 'fit-audio' | 'fixed-clip' | 'explicit'; clip?: number };
+	timing?: { policy: 'fit-audio' | 'fixed-clip' | 'explicit'; clip?: number; duration?: number };
 	/** moves is the Look's list, in cycle order. Shuffle moves draws from it. */
 	moves?: string[];
 	slots?: Picture[];

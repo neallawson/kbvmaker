@@ -37,6 +37,42 @@ func TestFFmpegPrintsOnlyErrorsAndProgress(t *testing.T) {
 	}
 }
 
+func TestMuxOmitsAudioWhenTheFilmHasNone(t *testing.T) {
+	p := quietPlan()
+	p.Audio = ""
+	cmds, err := Commands(p, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cmds {
+		if c.Stage == "probe" {
+			t.Fatalf("probe %v", c.Argv)
+		}
+	}
+	mux := strings.Join(stageArgv(cmds, "mux"), " ")
+	if !strings.Contains(mux, "-an") || strings.Contains(mux, "song.mp3") || strings.Contains(mux, "-shortest") {
+		t.Fatalf("mux %s", mux)
+	}
+	withSong := quietPlan()
+	cmds, err = Commands(withSong, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux = strings.Join(stageArgv(cmds, "mux"), " ")
+	if !strings.Contains(mux, "-i song.mp3") || !strings.Contains(mux, "-shortest") {
+		t.Fatalf("mux %s", mux)
+	}
+}
+
+func stageArgv(cmds []Command, stage string) []string {
+	for _, c := range cmds {
+		if c.Stage == stage {
+			return c.Argv
+		}
+	}
+	return nil
+}
+
 func TestVerboseKeepsFFmpegOutput(t *testing.T) {
 	cmds, err := Commands(quietPlan(), Options{Verbose: true})
 	if err != nil {
