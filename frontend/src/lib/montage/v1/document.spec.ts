@@ -153,6 +153,29 @@ describe('project edits', () => {
 		expect(names()).toEqual(['a.jpg', 'b.jpg', 'c.jpg', 'Title']);
 	});
 
+	it('keeps a fixed place when the slot is moved or a Look is applied', () => {
+		let file = setFixed(setFixed(addCard(addPictures(newProject(), ['a.jpg', 'b.jpg'])), 0, true), 2, true);
+		const names = () => file.slots?.map((slot) => slot.card?.title ?? slot.src);
+		file = moveSlot(file, 0, 1);
+		expect(names()).toEqual(['b.jpg', 'a.jpg', 'Title']);
+		expect(file.slots?.map((slot) => slot.fixed)).toEqual([undefined, true, true]);
+		file = moveSlot(file, 1, -1);
+		expect(names()).toEqual(['a.jpg', 'b.jpg', 'Title']);
+		expect(file.slots?.[0].fixed).toBe(true);
+		file = reorderSlot(file, 2, 0);
+		expect(names()).toEqual(['Title', 'a.jpg', 'b.jpg']);
+		expect(file.slots?.map((slot) => slot.fixed)).toEqual([true, true, undefined]);
+		file = setDur(file, 1, 9);
+		file = applyLook(file, 'quick-slides');
+		expect(file.slots?.[0]).toMatchObject({ fixed: true, mode: 'hold' });
+		expect(file.slots?.[1]).toMatchObject({ src: 'a.jpg', fixed: true, mode: 'in-center' });
+		expect(file.slots?.[1].dur).toBeUndefined();
+		file = setDur(file, 1, 9);
+		file = applyLook(file, 'photo-film');
+		expect(file.slots?.[0]).toMatchObject({ fixed: true, mode: 'hold' });
+		expect(file.slots?.[1]).toMatchObject({ src: 'a.jpg', fixed: true, dur: 9, mode: 'in-left-right' });
+	});
+
 	it('shuffles inside the Look’s move list', () => {
 		const file = addPictures(applyLook(newProject(), 'photo-film'), ['a.jpg', 'b.jpg']);
 		expect(shuffleMoves(file, () => 0).slots?.map((slot) => slot.mode)).toEqual(['in-center', 'in-center']);

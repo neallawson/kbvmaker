@@ -701,6 +701,54 @@ describe('Editor', () => {
 		expect(gripRight).toBeLessThanOrEqual(pictureLeft + 0.01);
 	});
 
+	it('pins a photograph and keeps that place through shuffle and sort', async () => {
+		const user = userEvent.setup();
+		const api = client();
+		render(Editor, { client: api.client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/z.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/m.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+
+		await user.click(screen.getByRole('button', { name: 'Pin position' }));
+		expect(await screen.findByRole('button', { name: 'Unpin position' })).toBeTruthy();
+		await waitFor(() => {
+			expect(api.plans.at(-1)?.slots?.map((slot) => slot.src)).toEqual([
+				'/films/z.jpg',
+				'/films/m.jpg',
+				'/films/a.jpg'
+			]);
+			expect(api.plans.at(-1)?.slots?.[0].fixed).toBe(true);
+			expect(api.plans.at(-1)?.slots?.[1].fixed).toBeUndefined();
+		});
+
+		await user.click(screen.getByRole('button', { name: 'Shuffle pictures' }));
+		expect(screen.getAllByRole('button', { name: '1. z.jpg' }).length).toBeGreaterThan(0);
+		expect(screen.queryByRole('button', { name: '2. z.jpg' })).toBeNull();
+		await user.click(screen.getByRole('button', { name: 'Sort by name' }));
+		expect(screen.getAllByRole('button', { name: '1. z.jpg' }).length).toBeGreaterThan(0);
+		expect(screen.getAllByRole('button', { name: '2. a.jpg' }).length).toBeGreaterThan(0);
+		expect(screen.getAllByRole('button', { name: '3. m.jpg' }).length).toBeGreaterThan(0);
+
+		await user.click(within(screen.getByRole('list')).getByRole('button', { name: /2\. a\.jpg/ }));
+		await user.click(screen.getByRole('button', { name: 'Pin position' }));
+		await user.click(screen.getByRole('button', { name: 'Move up' }));
+		await waitFor(() => {
+			expect(api.plans.at(-1)?.slots).toMatchObject([
+				{ src: '/films/a.jpg', fixed: true },
+				{ src: '/films/z.jpg', fixed: true },
+				{ src: '/films/m.jpg' }
+			]);
+		});
+		expect(api.plans.at(-1)?.slots?.[2].fixed).toBeUndefined();
+		expect(screen.getAllByRole('button', { name: '1. a.jpg' }).length).toBeGreaterThan(0);
+		expect(screen.getAllByRole('button', { name: '2. z.jpg' }).length).toBeGreaterThan(0);
+	});
+
 	it('adds a title card you can edit, and keeps Hold still under a Look', async () => {
 		const user = userEvent.setup();
 		const api = client();
