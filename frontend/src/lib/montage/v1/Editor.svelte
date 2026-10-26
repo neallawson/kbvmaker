@@ -4,8 +4,9 @@
 	import { Card, CardContent } from '#lib/components/ui/card';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs';
 	import type { Host } from '#lib/platform/host';
-	import { RuleError, type Client, type MontageFile, type Plan } from './client';
+	import { RuleError, type Card as TitleCard, type Client, type MontageFile, type Picture, type Plan } from './client';
 	import {
+		addCard,
 		addPictures,
 		applyLook,
 		baseName,
@@ -34,13 +35,16 @@
 		scoreJoins,
 		secondsLabel,
 		setAudio,
+		setCard,
 		setTimeEach,
+		slotLabel,
 		songClock,
 		setDur,
 		setMode,
 		shuffleMoves,
 		shuffleSlots,
 		sortByName,
+		isCard,
 		type LookId
 	} from './document';
 	import { describePlan } from './summary';
@@ -67,6 +71,8 @@
 	let songSeconds = $state<number | null>(null);
 	let pictureDraft = $state('');
 	let lengthDraft = $state<string | null>(null);
+	/** cardDraft holds title text until the field is left, so the thumbnail is not painted on every key. */
+	let cardDraft = $state<{ title: string; subtitle: string; line: string; credits: string } | null>(null);
 	let eachDraft = $state<string | null>(null);
 	let thumbs = $state<Record<string, string>>({});
 	let trackEl = $state<HTMLDivElement | null>(null);
@@ -159,38 +165,50 @@
 	$effect(() => {
 		const generation = thumbGen;
 		const dir = projectDir(filePath);
-		const paths = (doc?.slots ?? []).map((slot) => mediaPath(dir, slot.src));
+		const slots = doc?.slots ?? [];
 		const pending = untrack(() => {
-			const next: string[] = [];
-			for (const path of paths) {
-				if (!path || thumbs[path] || thumbInflight.has(path) || next.includes(path)) {
+			const next: { key: string; slot: Picture }[] = [];
+			const seen = new Set<string>();
+			for (const slot of slots) {
+				const key = thumbKey(slot, dir);
+				if (!key || thumbs[key] || thumbInflight.has(key) || seen.has(key)) {
 					continue;
 				}
-				next.push(path);
+				seen.add(key);
+				next.push({ key, slot });
 			}
 			return next;
 		});
-		for (const path of pending) {
-			thumbInflight.add(path);
-			void client
-				.thumb(path, thumbWidth, thumbHeight)
+		for (const item of pending) {
+			thumbInflight.add(item.key);
+			const req = item.slot.card
+				? client.thumbCard(item.slot.card, thumbWidth, thumbHeight)
+				: client.thumb(thumbKey(item.slot, dir), thumbWidth, thumbHeight);
+			void req
 				.then((url) => {
 					if (generation !== thumbGen) {
 						return;
 					}
-					thumbs[path] = url;
+					thumbs[item.key] = url;
 				})
 				.catch(() => {})
 				.finally(() => {
 					if (generation === thumbGen) {
-						thumbInflight.delete(path);
+						thumbInflight.delete(item.key);
 					}
 				});
 		}
 	});
 
-	function thumbFor(src: string): string {
-		return thumbs[mediaPath(projectDir(filePath), src)] ?? '';
+	function thumbKey(slot: Picture, dir = projectDir(filePath)): string {
+		if (slot.card) {
+			return `card:${JSON.stringify(slot.card)}`;
+		}
+		return mediaPath(dir, slot.src ?? '');
+	}
+
+	function thumbForSlot(slot: Picture | undefined): string {
+		return slot ? (thumbs[thumbKey(slot)] ?? '') : '';
 	}
 
 	/** checkFiles reads the soundtrack and pictures from disk and loads their thumbnails again. */
@@ -198,17 +216,17 @@
 		if (!doc || working) {
 			return;
 		}
-		const dir = projectDir(filePath);
-		const drop = new Set((doc.slots ?? []).map((slot) => mediaPath(dir, slot.src)).filter(Boolean));
 		const next: Record<string, string> = {};
-		for (const [path, url] of Object.entries(thumbs)) {
-			if (!drop.has(path)) {
-				next[path] = url;
+		for (const [key, url] of Object.entries(thumbs)) {
+			if (key.startsWith('card:')) {
+				next[key] = url;
 			}
 		}
 		thumbs = next;
-		for (const path of drop) {
-			thumbInflight.delete(path);
+		for (const key of [...thumbInflight]) {
+			if (!key.startsWith('card:')) {
+				thumbInflight.delete(key);
+			}
 		}
 		thumbGen += 1;
 		scan += 1;
@@ -237,6 +255,7 @@
 		dirty = true;
 		lengthDraft = null;
 		eachDraft = null;
+		cardDraft = null;
 		if (!holdPreview) {
 			preview = null;
 			gripCommit = false;
@@ -393,6 +412,60 @@
 		pictureDraft = '';
 	}
 
+	function addTitleCard() {
+		if (!doc) {
+			return;
+		}
+		edit(addCard(doc));
+		selected = (doc.slots?.length ?? 1) - 1;
+	}
+
+	function editCard(patch: Partial<TitleCard>) {
+		if (!doc) {
+			return;
+		}
+		const slot = doc.slots?.[selected];
+		if (!slot?.card) {
+			return;
+		}
+		edit(setCard(doc, selected, { ...slot.card, ...patch }));
+	}
+
+	function cardText(slot: Picture, field: 'title' | 'subtitle' | 'line' | 'credits'): string {
+		if (cardDraft) {
+			return cardDraft[field];
+		}
+		if (field === 'credits') {
+			return (slot.card?.credits ?? []).join('\n');
+		}
+		return slot.card?.[field] ?? '';
+	}
+
+	function draftCard(slot: Picture, field: 'title' | 'subtitle' | 'line' | 'credits', value: string) {
+		cardDraft = {
+			title: slot.card?.title ?? '',
+			subtitle: slot.card?.subtitle ?? '',
+			line: slot.card?.line ?? '',
+			credits: (slot.card?.credits ?? []).join('\n'),
+			...cardDraft,
+			[field]: value
+		};
+	}
+
+	function commitCardText(slot: Picture) {
+		if (!cardDraft || !slot.card) {
+			return;
+		}
+		const next = cardDraft;
+		cardDraft = null;
+		editCard({
+			title: next.title,
+			subtitle: next.subtitle,
+			line: next.line,
+			credits: next.credits.split('\n')
+		});
+	}
+
 	async function replacePicture() {
 		if (!doc) {
 			return;
@@ -546,7 +619,7 @@
 		const source =
 			preview && doc?.slots
 				? blocksFromLengths(
-						doc.slots.map((slot) => slot.src),
+						doc.slots.map((slot) => slotLabel(slot)),
 						preview.lengths,
 						preview.dissolve
 					)
@@ -642,6 +715,7 @@
 	function choose(index: number) {
 		selected = index;
 		lengthDraft = null;
+		cardDraft = null;
 	}
 
 	function onPictureClick(index: number) {
@@ -930,6 +1004,7 @@
 					/>
 				{/if}
 				<Button variant="outline" onclick={() => addPicture()}>Add pictures</Button>
+				<Button variant="outline" onclick={addTitleCard}>Add card</Button>
 				<Button variant="outline" onclick={() => edit(sortByName(doc!))}>Sort by name</Button>
 				<Button variant="outline" onclick={() => edit(shuffleSlots(doc!))}>Shuffle pictures</Button>
 				<Button variant="outline" onclick={() => edit(shuffleMoves(doc!))}>Shuffle moves</Button>
@@ -953,14 +1028,14 @@
 								? 'ring-primary z-10 ring-2 ring-inset'
 								: 'z-0'} bg-[oklch(0.78_0_0)] {dragArmed ? 'slot-move' : ''}"
 							style="left: {block.left}%; width: {block.width}%"
-							title={baseName(block.src)}
-							aria-label="{block.slot + 1}. {baseName(block.src)}"
+							title={block.src}
+							aria-label="{block.slot + 1}. {block.src}"
 							aria-pressed={selected === block.slot}
 							onpointerdown={(event) => startPicture(event, block.slot)}
 							onclick={() => onPictureClick(block.slot)}
 						>
-							{#if thumbFor(block.src)}
-								<img alt="" src={thumbFor(block.src)} draggable="false" class="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+							{#if thumbForSlot(doc.slots?.[block.slot])}
+								<img alt="" src={thumbForSlot(doc.slots?.[block.slot])} draggable="false" class="pointer-events-none absolute inset-0 h-full w-full object-cover" />
 							{/if}
 							<span class="mark-n pointer-events-none relative z-10 rounded bg-black/60 px-1 text-white">{block.slot + 1}</span>
 						</button>
@@ -1000,8 +1075,8 @@
 						data-lift
 						aria-hidden="true"
 					>
-						{#if thumbFor(blocks[lift.index].src)}
-							<img alt="" src={thumbFor(blocks[lift.index].src)} draggable="false" class="absolute inset-0 h-full w-full object-cover" />
+						{#if thumbForSlot(doc.slots?.[lift.index])}
+							<img alt="" src={thumbForSlot(doc.slots?.[lift.index])} draggable="false" class="absolute inset-0 h-full w-full object-cover" />
 						{:else}
 							<div class="absolute inset-0 bg-[oklch(0.78_0_0)]"></div>
 						{/if}
@@ -1021,14 +1096,14 @@
 			{/if}
 
 			<ul class="flex flex-col gap-2">
-				{#each doc.slots ?? [] as slot, index (slot.src + index)}
+				{#each doc.slots ?? [] as slot, index (`${slot.src ?? 'card'}:${index}`)}
 					<li class="rounded-md border p-3 {selected === index ? 'border-primary' : ''}">
 						<button type="button" class="flex w-full min-w-0 items-center gap-2 text-left" onclick={() => choose(index)}>
-							{#if thumbFor(slot.src)}
-								<img alt="" src={thumbFor(slot.src)} class="h-10 w-16 shrink-0 rounded object-cover" />
+							{#if thumbForSlot(slot)}
+								<img alt="" src={thumbForSlot(slot)} class="h-10 w-16 shrink-0 rounded object-cover" />
 							{/if}
 							<span class="min-w-0 break-all">
-								{index + 1}. {baseName(slot.src)}
+								{index + 1}. {slotLabel(slot)}
 								{#if plan?.slots[index]}
 									<span class="text-muted-foreground"> · {secondsLabel(plan.slots[index].clipDur)}s</span>
 								{/if}
@@ -1039,6 +1114,154 @@
 						{/if}
 						{#if selected === index}
 							<div class="mt-3 flex flex-col gap-2">
+								{#if slot.card}
+									<label class="flex flex-col gap-1 text-sm">
+										Title
+										<input
+											class="border-input bg-background h-9 rounded-md border px-3"
+											aria-label="Title"
+											value={cardText(slot, 'title')}
+											oninput={(event) => draftCard(slot, 'title', event.currentTarget.value)}
+											onchange={() => commitCardText(slot)}
+										/>
+									</label>
+									<label class="flex flex-col gap-1 text-sm">
+										Subtitle
+										<input
+											class="border-input bg-background h-9 rounded-md border px-3"
+											aria-label="Subtitle"
+											value={cardText(slot, 'subtitle')}
+											oninput={(event) => draftCard(slot, 'subtitle', event.currentTarget.value)}
+											onchange={() => commitCardText(slot)}
+										/>
+									</label>
+									<label class="flex flex-col gap-1 text-sm">
+										Third line
+										<input
+											class="border-input bg-background h-9 rounded-md border px-3"
+											aria-label="Third line"
+											value={cardText(slot, 'line')}
+											oninput={(event) => draftCard(slot, 'line', event.currentTarget.value)}
+											onchange={() => commitCardText(slot)}
+										/>
+									</label>
+									<label class="flex flex-col gap-1 text-sm">
+										Credits
+										<textarea
+											class="border-input bg-background min-h-20 rounded-md border px-3 py-2"
+											aria-label="Credits"
+											value={cardText(slot, 'credits')}
+											oninput={(event) => draftCard(slot, 'credits', event.currentTarget.value)}
+											onchange={() => commitCardText(slot)}
+										></textarea>
+									</label>
+									<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+										<label class="flex flex-col gap-1 text-sm">
+											Align
+											<select
+												class="border-input bg-background h-9 rounded-md border px-2"
+												aria-label="Align"
+												value={slot.card.align ?? 'center'}
+												onchange={(event) =>
+													editCard({ align: event.currentTarget.value as TitleCard['align'] })}
+											>
+												<option value="left">Left</option>
+												<option value="center">Center</option>
+												<option value="right">Right</option>
+											</select>
+										</label>
+										<label class="flex flex-col gap-1 text-sm">
+											Vertical
+											<select
+												class="border-input bg-background h-9 rounded-md border px-2"
+												aria-label="Vertical"
+												value={slot.card.vAlign ?? 'middle'}
+												onchange={(event) =>
+													editCard({ vAlign: event.currentTarget.value as TitleCard['vAlign'] })}
+											>
+												<option value="upper">Upper</option>
+												<option value="middle">Middle</option>
+												<option value="lower">Lower</option>
+											</select>
+										</label>
+										<label class="flex flex-col gap-1 text-sm">
+											Size
+											<select
+												class="border-input bg-background h-9 rounded-md border px-2"
+												aria-label="Size"
+												value={slot.card.size ?? 'medium'}
+												onchange={(event) =>
+													editCard({ size: event.currentTarget.value as TitleCard['size'] })}
+											>
+												<option value="small">Small</option>
+												<option value="medium">Medium</option>
+												<option value="large">Large</option>
+											</select>
+										</label>
+										<label class="flex flex-col gap-1 text-sm">
+											Weight
+											<select
+												class="border-input bg-background h-9 rounded-md border px-2"
+												aria-label="Weight"
+												value={slot.card.weight ?? 'bold'}
+												onchange={(event) =>
+													editCard({ weight: event.currentTarget.value as TitleCard['weight'] })}
+											>
+												<option value="regular">Regular</option>
+												<option value="bold">Bold</option>
+											</select>
+										</label>
+										<label class="flex flex-col gap-1 text-sm">
+											Face
+											<select
+												class="border-input bg-background h-9 rounded-md border px-2"
+												aria-label="Face"
+												value={slot.card.face ?? 'sans'}
+												onchange={(event) =>
+													editCard({ face: event.currentTarget.value as TitleCard['face'] })}
+											>
+												<option value="sans">Sans</option>
+												<option value="serif">Serif</option>
+											</select>
+										</label>
+										<label class="flex items-center gap-2 text-sm">
+											<input
+												type="checkbox"
+												checked={slot.card.box ?? false}
+												onchange={(event) => editCard({ box: event.currentTarget.checked })}
+											/>
+											Faint box
+										</label>
+									</div>
+									<div class="grid grid-cols-2 gap-2">
+										<label class="flex flex-col gap-1 text-sm">
+											Text color
+											<span class="border-input bg-background flex h-9 items-center gap-2 rounded-md border px-2">
+												<input
+													type="color"
+													class="color-chip"
+													aria-label="Text color"
+													value={slot.card.color ?? '#FFFFFF'}
+													onchange={(event) => editCard({ color: event.currentTarget.value.toUpperCase() })}
+												/>
+												<span class="font-mono text-xs">{(slot.card.color ?? '#FFFFFF').toUpperCase()}</span>
+											</span>
+										</label>
+										<label class="flex flex-col gap-1 text-sm">
+											Background
+											<span class="border-input bg-background flex h-9 items-center gap-2 rounded-md border px-2">
+												<input
+													type="color"
+													class="color-chip"
+													aria-label="Background color"
+													value={slot.card.fill ?? '#000000'}
+													onchange={(event) => editCard({ fill: event.currentTarget.value.toUpperCase() })}
+												/>
+												<span class="font-mono text-xs">{(slot.card.fill ?? '#000000').toUpperCase()}</span>
+											</span>
+										</label>
+									</div>
+								{/if}
 								<label class="flex flex-col gap-1 text-sm">
 									Move
 									<select
@@ -1080,7 +1303,9 @@
 										index === (doc.slots?.length ?? 1) - 1,
 										'down'
 									)}
-									{@render pictureAction('Replace', replacePicture, false, 'replace')}
+									{#if !isCard(slot)}
+										{@render pictureAction('Replace', replacePicture, false, 'replace')}
+									{/if}
 									{@render pictureAction(
 										'Remove',
 										() => {
@@ -1144,6 +1369,37 @@
 	}
 	.mark {
 		container-type: inline-size;
+	}
+	.color-chip {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 1.75rem;
+		height: 1.75rem;
+		margin: 0;
+		padding: 2px;
+		border: 1px solid #111;
+		border-radius: 0.25rem;
+		background-color: #fff;
+		background-image:
+			linear-gradient(45deg, #bdbdbd 25%, transparent 25%),
+			linear-gradient(-45deg, #bdbdbd 25%, transparent 25%),
+			linear-gradient(45deg, transparent 75%, #bdbdbd 75%),
+			linear-gradient(-45deg, transparent 75%, #bdbdbd 75%);
+		background-size: 8px 8px;
+		background-position:
+			0 0,
+			0 4px,
+			4px -4px,
+			-4px 0;
+		cursor: pointer;
+	}
+	.color-chip::-webkit-color-swatch-wrapper {
+		padding: 0;
+	}
+	.color-chip::-webkit-color-swatch,
+	.color-chip::-moz-color-swatch {
+		border: 1px solid rgba(0, 0, 0, 0.55);
+		border-radius: 2px;
 	}
 	.mark-n {
 		display: none;

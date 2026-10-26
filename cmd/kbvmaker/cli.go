@@ -554,7 +554,11 @@ func cleanWork(dir, work string, cmds []v1.Command) {
 		root = filepath.Join(dir, root)
 	}
 	for _, c := range cmds {
-		for _, a := range c.Argv {
+		args := c.Argv
+		if c.File != "" {
+			args = append(append([]string{}, c.Argv...), c.File)
+		}
+		for _, a := range args {
 			p := a
 			if !filepath.IsAbs(p) {
 				p = filepath.Join(dir, p)
@@ -570,7 +574,7 @@ func cleanWork(dir, work string, cmds []v1.Command) {
 }
 
 // intermediate matches the names the compiler gives canvases, clips, and joins.
-var intermediate = regexp.MustCompile(`^(canvas-\d+\.png|clip-\d{3}\.mp4|join-\d{3}\.mp4)$`)
+var intermediate = regexp.MustCompile(`^(canvas-\d+\.png|card-\d+\.png|clip-\d{3}\.mp4|join-\d{3}\.mp4)$`)
 
 func clock(seconds float64) string {
 	total := int(seconds + 0.5)

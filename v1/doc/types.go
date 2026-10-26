@@ -94,9 +94,10 @@ type ModeDef struct {
 	Motion []Segment `json:"motion"`
 }
 
-// Slot is one picture in the authored timeline.
+// Slot is one picture or card in the authored timeline.
 type Slot struct {
-	Src      string     `json:"src"`
+	Src      string     `json:"src,omitempty"`
+	Card     *Card      `json:"card,omitempty"`
 	Mode     string     `json:"mode,omitempty"`
 	Motion   []Segment  `json:"motion,omitempty"`
 	BasedOn  string     `json:"basedOn,omitempty"`

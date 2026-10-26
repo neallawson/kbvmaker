@@ -254,8 +254,24 @@ func validateSchedule(s *Schedule) error {
 }
 
 func validateSlot(d *Document, s Slot, slot int) error {
-	if s.Src == "" || IsURL(s.Src) {
+	hasSrc := s.Src != ""
+	hasCard := s.Card != nil
+	if hasSrc && hasCard {
+		return rule.E(slot, "unknown-field", "a slot has src and card")
+	}
+	if !hasSrc && !hasCard {
+		return rule.E(slot, "missing-media", "src or card")
+	}
+	if hasSrc && IsURL(s.Src) {
 		return rule.E(slot, "missing-media", "src")
+	}
+	if hasCard {
+		if s.Backdrop != nil {
+			return rule.E(slot, "unknown-field", "a card does not take a backdrop")
+		}
+		if err := s.Card.Finish(slot); err != nil {
+			return err
+		}
 	}
 	hasMode := s.Mode != ""
 	hasMotion := len(s.Motion) > 0

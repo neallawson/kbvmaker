@@ -7,13 +7,17 @@ import (
 	"strconv"
 	"strings"
 
+	"kbvmaker/v1/card"
 	"kbvmaker/v1/model"
 )
 
 // Command is one process the engine or an export would run.
+// A card stage writes File from Body instead of running Argv.
 type Command struct {
 	Stage string
 	Argv  []string
+	File  string
+	Body  []byte
 }
 
 // Options controls binary names and how large one xfade graph may be.
@@ -69,9 +73,21 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 	}
 	canvasOf := map[string]string{}
 	n := 0
+	cards := 0
 	for _, s := range p.Slots {
 		key := canvasKey(s)
 		if _, ok := canvasOf[key]; ok {
+			continue
+		}
+		if s.Card != nil {
+			path := filepath.Join(opt.Work, fmt.Sprintf("card-%d.png", cards))
+			png, err := card.PNG(*s.Card, p.Canvas.Width, p.Canvas.Height)
+			if err != nil {
+				return nil, fmt.Errorf("slot %d card: %w", s.Index, err)
+			}
+			canvasOf[key] = path
+			cards++
+			cmds = append(cmds, Command{Stage: "card", File: path, Body: png})
 			continue
 		}
 		path := filepath.Join(opt.Work, fmt.Sprintf("canvas-%d.png", n))
@@ -138,6 +154,9 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 }
 
 func canvasKey(s model.Slot) string {
+	if s.Card != nil {
+		return "card\x00" + fmt.Sprintf("%#v", *s.Card)
+	}
 	b := s.Backdrop
 	return s.Src + "\x00" + b.Kind + "\x00" + b.Color + "\x00" + b.Name + "\x00" + b.Src + "\x00" + num(b.Blur)
 }

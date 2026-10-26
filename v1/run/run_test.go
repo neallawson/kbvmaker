@@ -108,6 +108,20 @@ func TestRunWithCancelKillsTheCommand(t *testing.T) {
 	}
 }
 
+func TestRunWritesCardBytes(t *testing.T) {
+	dir := t.TempDir()
+	err := RunWith(context.Background(), dir, []compile.Command{
+		{Stage: "card", File: "work/card-0.png", Body: []byte("png-bytes")},
+	}, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "work", "card-0.png"))
+	if err != nil || string(got) != "png-bytes" {
+		t.Fatalf("wrote %q %v", got, err)
+	}
+}
+
 func TestRunWithCreatesTheWorkDirectory(t *testing.T) {
 	dir := t.TempDir()
 	abs := filepath.Join(t.TempDir(), "scratch")

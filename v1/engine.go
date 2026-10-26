@@ -18,7 +18,7 @@ type Engine struct {
 	Options CompileOptions
 }
 
-// Command is one ffmpeg or ffprobe argument list.
+// Command is one ffmpeg or ffprobe argument list, or a card PNG write.
 type Command = compile.Command
 
 // CompileOptions names the ffmpeg binaries, the work directory, and ffmpeg's verbosity.

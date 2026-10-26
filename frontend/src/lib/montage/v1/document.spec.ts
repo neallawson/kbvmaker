@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MontageFile } from './client';
 import {
+	addCard,
 	addPictures,
 	applyLook,
 	canPlan,
@@ -22,7 +23,9 @@ import {
 	setAudio,
 	setDur,
 	setFilmLength,
+	setCard,
 	setTimeEach,
+	slotLabel,
 	unlockFilm,
 	shuffleMoves,
 	shuffleSlots,
@@ -340,5 +343,25 @@ describe('project edits', () => {
 		file = applyLook({ ...file, audio: 'song.mp3' }, 'photo-film');
 		expect(file.timing).toEqual({ policy: 'fit-audio' });
 		expect(file.slots?.[0].dur).toBe(9);
+	});
+
+	it('appends a hold title card and keeps hold when a Look is applied', () => {
+		let file = addCard(addPictures(newProject(), ['a.jpg']));
+		expect(file.slots?.[1]).toEqual({ card: { title: 'Title' }, mode: 'hold' });
+		expect(slotLabel(file.slots![1])).toBe('Title');
+		file = setCard(file, 1, { title: 'Opening', subtitle: 'a short film' });
+		expect(slotLabel(file.slots![1])).toBe('Opening');
+		file = applyLook(file, 'classic');
+		expect(file.slots?.map((slot) => slot.mode)).toEqual(['in-center', 'hold']);
+		file = shuffleMoves(file, () => 0);
+		expect(file.slots?.[1].mode).toBe('hold');
+	});
+
+	it('sorts a card by its title among the pictures', () => {
+		let file = addPictures(newProject(), ['b.jpg']);
+		file = addCard(file);
+		file = setCard(file, 1, { title: 'Alpha' });
+		file = sortByName(file);
+		expect(file.slots?.map((slot) => slotLabel(slot))).toEqual(['Alpha', 'b.jpg']);
 	});
 });

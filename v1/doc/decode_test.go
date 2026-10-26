@@ -272,3 +272,75 @@ func TestSilentClocks(t *testing.T) {
 		t.Fatalf("needs song: %v", err)
 	}
 }
+
+func TestDecodeCard(t *testing.T) {
+	d, err := Decode([]byte(`{
+	  "montage": 1,
+	  "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [
+	    {"card": {"title": "Greenhouse", "subtitle": "a short film"}, "mode": "hold"},
+	    {"src": "a.jpg", "mode": "hold"}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if d.Slots[0].Card == nil || d.Slots[0].Card.Title != "Greenhouse" || d.Slots[0].Src != "" {
+		t.Fatalf("card %+v", d.Slots[0])
+	}
+}
+
+func TestCardRules(t *testing.T) {
+	both, err := Decode([]byte(`{
+	  "montage": 1, "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [{"src": "a.jpg", "card": {"title": "X"}, "mode": "hold"}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = both.Validate()
+	re, ok := rule.As(err)
+	if !ok || re.Code != "unknown-field" {
+		t.Fatalf("both: %v", err)
+	}
+
+	empty, err := Decode([]byte(`{
+	  "montage": 1, "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [{"card": {"subtitle": "no title"}, "mode": "hold"}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = empty.Validate()
+	re, ok = rule.As(err)
+	if !ok || re.Code != "missing-field" {
+		t.Fatalf("empty card: %v", err)
+	}
+
+	credits, err := Decode([]byte(`{
+	  "montage": 1, "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [{"card": {"credits": ["Ada — Camera"]}, "mode": "hold"}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := credits.Validate(); err != nil {
+		t.Fatal(err)
+	}
+
+	face, err := Decode([]byte(`{
+	  "montage": 1, "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [{"card": {"title": "X", "face": "comic"}, "mode": "hold"}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = face.Validate()
+	re, ok = rule.As(err)
+	if !ok || re.Code != "unknown-field" {
+		t.Fatalf("face: %v", err)
+	}
+}

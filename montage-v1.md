@@ -267,7 +267,8 @@ file does not carry.
 
 ```
 Slot {
-  src:       string
+  src?:      string
+  card?:     Card
   mode?:     string
   motion?:   Segment[]
   basedOn?:  string
@@ -276,6 +277,21 @@ Slot {
   dur?:      number
   until?:    TimePoint
   backdrop?: Backdrop
+}
+
+Card {
+  title?:    string
+  subtitle?: string
+  line?:     string
+  credits?:  string[]
+  align?:    "left" | "center" | "right"
+  vAlign?:   "upper" | "middle" | "lower"
+  size?:     "small" | "medium" | "large"
+  weight?:   "regular" | "bold"
+  face?:     "sans" | "serif"
+  color?:    string
+  fill?:     string
+  box?:      boolean
 }
 
 Segment {
@@ -289,6 +305,25 @@ Segment {
 
 ModeDef { family: "reveal" | "scan", motion: Segment[] }
 ```
+
+A slot has `src` or `card`, exactly one. `src` is a still image path on disk.
+`card` is a title or credits screen the engine paints at render: a PNG the
+size of the canvas, used as that clip's still. Standard ffmpeg then moves and
+dissolves it the same way it would a photograph. A card does not take
+`backdrop`; `fill` is the background.
+
+A card has text after trimming in `title`, or at least one non-empty entry in
+`credits`, or both. `subtitle` and `line` are optional lines under the title.
+`credits` is one line per array entry, drawn in the same alignment under that
+title block. Omitted placement and style fields take these defaults: `align`
+`center`, `vAlign` `middle`, `size` `medium`, `weight` `bold`, `face` `sans`,
+`color` `#FFFFFF`, `fill` `#000000`, `box` `false`. `color` and `fill` are
+`#RRGGBB`. `box` paints a faint rectangle behind the text. Title size is 4%,
+7%, or 11% of the canvas height (`small` / `medium` / `large`). Subtitle is
+55% of that, the third line 45%, and each credit 40%. Side margins are 8% of
+the width. `upper` starts about 18% down from the top, `lower` ends about 18%
+up from the bottom, `middle` centers the block. The engine ships Liberation
+Sans and Liberation Serif (SIL OFL 1.1).
 
 A slot has `mode` or `motion`, exactly one. `motion` has at least one
 segment. `basedOn` is allowed only with `motion`. The engine does not render
@@ -713,7 +748,7 @@ and the rule.
 
 | Rule | Condition |
 | --- | --- |
-| `missing-media` | An audio, image, list, or pool path does not exist, or a probed file is not the kind of media the path claims. |
+| `missing-media` | An audio, image, list, or pool path does not exist, or a probed file is not the kind of media the path claims. A slot with neither `src` nor `card` also uses this code. |
 | `bad-number` | A duration, zoom, percent, dimension, or seed is outside its range. |
 | `bad-time` | A time point is malformed, or a marker `until` is not on the song clock. |
 | `cuts` | Marker cuts are not strictly increasing, or an `until` is at or outside the song. |
@@ -734,7 +769,9 @@ Family `scan` skips the `reveal` check and still passes every other rule.
 The engine renders each slot's canvas through the motion filter for
 `clipDur` seconds, joins the clips with `xfade` of type `fade` at the
 resolved offsets, and muxes the soundtrack when the document has one.
-A document with no soundtrack writes the video stream only.
+A document with no soundtrack writes the video stream only. A card's canvas
+is the painted PNG; the photograph blur path is not used, so the letters stay
+sharp.
 
 Video defaults are the Output defaults. Audio is AAC at `audioBitrate` when
 a soundtrack is muxed. That output is trimmed to the shorter of the resolved
@@ -742,10 +779,17 @@ video duration and the song (`-shortest` in ffmpeg terms). `+faststart` is
 set on the file.
 
 The plan, before any encode, reports the song duration when there is a song,
-each slot's source,
+each slot's source or card,
 mode or `basedOn`, family, clip start, clip duration, opaque range, `fill`,
 the far zoom, and each join's start and midpoint. That report is the
 resolved timeline. It is not written back into the document.
+
+A card slot is painted in Go to `work/card-N.png` before the clip that reads
+it. That write is a `card` stage: the PNG bytes travel with the command list.
+The bash export decodes them with `base64`. The `renderPlan` JSON carries the
+same bytes in `files`, a map of relative path to standard-base64. Clip, join,
+and mux stay ordinary ffmpeg. There is no `drawtext` filter and no special
+ffmpeg build.
 
 ## 14. Examples
 
@@ -759,6 +803,33 @@ spec. `duration` and `hold` are seconds.
   "slots": [
     { "src": "Greenhouse3.jpg", "mode": "out-center" },
     { "src": "Greenhouse8.jpg", "mode": "in-left-right" }
+  ]
+}
+```
+
+A title card, two photographs, and a credits roll. The cards are Hold still
+and Drift up. Lengths follow the Look.
+
+```json
+{
+  "montage": 1,
+  "timing": { "policy": "fixed-clip", "clip": 5 },
+  "slots": [
+    { "card": { "title": "Greenhouse", "subtitle": "a short film" }, "mode": "hold" },
+    { "src": "Greenhouse3.jpg", "mode": "out-center" },
+    { "src": "Greenhouse8.jpg", "mode": "in-left-right" },
+    {
+      "card": {
+        "title": "Credits",
+        "credits": ["Camera — Ada", "Edit — Beau"],
+        "align": "left",
+        "vAlign": "lower",
+        "size": "small",
+        "weight": "regular"
+      },
+      "mode": "in-bottom-top",
+      "dur": 8
+    }
   ]
 }
 ```

@@ -31,6 +31,9 @@ function client(): Client {
 		async render() {},
 		async thumb() {
 			return '';
+		},
+		async thumbCard() {
+			return '';
 		}
 	};
 }

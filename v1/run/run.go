@@ -85,9 +85,6 @@ func RunWith(ctx context.Context, dir string, cmds []compile.Command, opt Option
 	}
 	seen := map[string]int{}
 	for i, c := range cmds {
-		if len(c.Argv) == 0 {
-			return fmt.Errorf("%s: empty command", c.Stage)
-		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -97,6 +94,27 @@ func RunWith(ctx context.Context, dir string, cmds []compile.Command, opt Option
 			opt.Progress(ev)
 		}
 		start := time.Now()
+		if len(c.Body) > 0 {
+			if c.File == "" {
+				return fmt.Errorf("%s: write is missing a path", c.Stage)
+			}
+			path := abs(dir, c.File)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(path, c.Body, 0o644); err != nil {
+				return err
+			}
+			if opt.Progress != nil {
+				ev.Done = true
+				ev.Seconds = time.Since(start).Seconds()
+				opt.Progress(ev)
+			}
+			continue
+		}
+		if len(c.Argv) == 0 {
+			return fmt.Errorf("%s: empty command", c.Stage)
+		}
 		cmd := exec.CommandContext(ctx, c.Argv[0], c.Argv[1:]...)
 		cmd.Dir = dir
 		var out bytes.Buffer

@@ -1,6 +1,8 @@
 // Package model holds the resolved timeline. It has no behavior.
 package model
 
+import "kbvmaker/v1/doc"
+
 // Plan is the resolved timeline for one Montage document.
 type Plan struct {
 	Montage    int     `json:"montage"`
@@ -44,23 +46,24 @@ type Output struct {
 	AudioBitrate int     `json:"audioBitrate"`
 }
 
-// Slot is one picture on the resolved timeline.
+// Slot is one picture or card on the resolved timeline.
 type Slot struct {
-	Index       int      `json:"index"`
-	Src         string   `json:"src"`
-	Mode        string   `json:"mode,omitempty"`
-	BasedOn     string   `json:"basedOn,omitempty"`
-	Family      string   `json:"family"`
-	ClipStart   float64  `json:"clipStart"`
-	ClipDur     float64  `json:"clipDur"`
-	OpaqueStart float64  `json:"opaqueStart"`
-	OpaqueEnd   float64  `json:"opaqueEnd"`
-	Fill        float64  `json:"fill"`
-	Backdrop    Backdrop `json:"backdrop"`
-	FarZoom     float64  `json:"farZoom"`
-	Join        *Join    `json:"join,omitempty"`
-	Spans       []Span   `json:"-"`
-	Fit         Fit      `json:"-"`
+	Index       int       `json:"index"`
+	Src         string    `json:"src,omitempty"`
+	Card        *doc.Card `json:"card,omitempty"`
+	Mode        string    `json:"mode,omitempty"`
+	BasedOn     string    `json:"basedOn,omitempty"`
+	Family      string    `json:"family"`
+	ClipStart   float64   `json:"clipStart"`
+	ClipDur     float64   `json:"clipDur"`
+	OpaqueStart float64   `json:"opaqueStart"`
+	OpaqueEnd   float64   `json:"opaqueEnd"`
+	Fill        float64   `json:"fill"`
+	Backdrop    Backdrop  `json:"backdrop"`
+	FarZoom     float64   `json:"farZoom"`
+	Join        *Join     `json:"join,omitempty"`
+	Spans       []Span    `json:"-"`
+	Fit         Fit       `json:"-"`
 }
 
 // Join is the dissolve that follows a slot.

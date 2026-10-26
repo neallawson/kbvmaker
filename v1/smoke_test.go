@@ -95,6 +95,21 @@ func TestFFmpegParsesADissolve(t *testing.T) {
 	}
 }
 
+func TestFFmpegRendersATitleCard(t *testing.T) {
+	probe := needFFmpeg(t)
+	dir := smokeMedia(t)
+	body := smokeBody(`"backdrop": {"kind": "color", "color": "#000000"}`, "", `{"card": {"title": "Greenhouse"}, "mode": "hold"}`, "")
+	cmds := compileSmoke(t, probe, dir, body)
+	runStages(t, dir, cmds, "card", "clip")
+	img := decodeStagePNG(t, dir, cmds, "card")
+	if img.Bounds().Dx() != 160 || img.Bounds().Dy() != 90 {
+		t.Fatalf("card %v", img.Bounds())
+	}
+	if probeFile(t, filepath.Join(dir, stageOutput(cmds, "clip"))).video().CodecName == "" {
+		t.Fatal("card clip produced no video stream")
+	}
+}
+
 func TestFFmpegHonorsOutputKnobs(t *testing.T) {
 	probe := needFFmpeg(t)
 	dir := smokeMedia(t)
@@ -269,6 +284,20 @@ func runStages(t *testing.T, dir string, cmds []v1.Command, stages ...string) {
 		if !want[c.Stage] {
 			continue
 		}
+		if len(c.Body) > 0 {
+			path := c.File
+			if !filepath.IsAbs(path) {
+				path = filepath.Join(dir, path)
+			}
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, c.Body, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			ran[c.Stage]++
+			continue
+		}
 		cmd := exec.Command(c.Argv[0], c.Argv[1:]...)
 		cmd.Dir = dir
 		out, err := cmd.CombinedOutput()
@@ -287,7 +316,14 @@ func runStages(t *testing.T, dir string, cmds []v1.Command, stages ...string) {
 func stageOutput(cmds []v1.Command, stage string) string {
 	var path string
 	for _, c := range cmds {
-		if c.Stage == stage && len(c.Argv) > 0 {
+		if c.Stage != stage {
+			continue
+		}
+		if c.File != "" {
+			path = c.File
+			continue
+		}
+		if len(c.Argv) > 0 {
 			path = c.Argv[len(c.Argv)-1]
 		}
 	}

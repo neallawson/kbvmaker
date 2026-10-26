@@ -19,7 +19,7 @@ kbvmaker help render
 | `validate --media FILE` | Also probes the song, every picture, and the ffmpeg filters. | `ok: 24 pictures, 3:42` |
 | `plan FILE` | Resolves the timeline. | Plan JSON |
 | `export-script FILE` | Compiles the render as bash. | Script |
-| `export-plan FILE` | Compiles the render as `renderPlan` JSON. | JSON |
+| `export-plan FILE` | Compiles the render as `renderPlan` JSON. Title cards add a `files` map of path to base64 PNG. | JSON |
 | `render FILE` | Runs ffmpeg and writes the video. | The video's path |
 | `serve` | Serves `/v1` (and the client with `-static DIR`) until interrupted. | — |
 | `version` | Build and Montage version. | `kbvmaker 9d847d0… (Montage 1)` |
@@ -122,7 +122,7 @@ kbvmaker render piece.montage.json
 - Intermediate canvases, clips, and joins go to `work/` under the project
   directory. `-work DIR` moves them (relative to the project directory unless
   absolute). `-clean` deletes them after a successful render. It removes only
-  the files this render named (`canvas-N.png`, `clip-NNN.mp4`,
+  the files this render named (`canvas-N.png`, `card-N.png`, `clip-NNN.mp4`,
   `join-NNN.mp4`), then the directory if it is empty and is not the project
   directory. A failed render keeps them for inspection.
 - ffmpeg prints only errors and its progress line. `-verbose` keeps its banner

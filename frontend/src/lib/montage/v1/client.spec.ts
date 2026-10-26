@@ -41,4 +41,16 @@ describe('Montage 1 client', () => {
 		await expect(client.thumb('/pics/a.jpg', 32, 18)).resolves.toBe('data:image/jpeg;base64,abc');
 		expect(JSON.parse(sent)).toEqual({ path: '/pics/a.jpg', width: 32, height: 18 });
 	});
+
+	it('asks for a painted card thumbnail', async () => {
+		let sent = '';
+		const client = createClient(async (_url, init) => {
+			sent = String(init?.body);
+			return json({ type: 'image/jpeg', width: 32, height: 18, data: 'card' });
+		});
+		await expect(client.thumbCard({ title: 'Greenhouse' }, 32, 18)).resolves.toBe(
+			'data:image/jpeg;base64,card'
+		);
+		expect(JSON.parse(sent)).toEqual({ card: { title: 'Greenhouse' }, width: 32, height: 18 });
+	});
 });

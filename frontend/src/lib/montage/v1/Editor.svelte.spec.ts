@@ -29,7 +29,12 @@ function client(read?: MontageFile): { client: Client; plans: MontageFile[] } {
 					montage: 1,
 					audio: body.audio,
 					timing: body.timing,
-					slots: body.slots?.map((slot) => ({ src: slot.src, mode: slot.mode, dur: slot.dur }))
+					slots: body.slots?.map((slot) => ({
+						src: slot.src,
+						card: slot.card,
+						mode: slot.mode,
+						dur: slot.dur
+					}))
 				});
 				return {
 					montage: 1,
@@ -59,6 +64,9 @@ function client(read?: MontageFile): { client: Client; plans: MontageFile[] } {
 			async render() {},
 			async thumb() {
 				return 'data:image/jpeg;base64,thumb';
+			},
+			async thumbCard() {
+				return 'data:image/jpeg;base64,cardthumb';
 			}
 		}
 	};
@@ -690,6 +698,46 @@ describe('Editor', () => {
 		expect(grip.style.left.endsWith('px')).toBe(true);
 		const gripRight = parseFloat(grip.style.left) + parseFloat(grip.style.width);
 		expect(gripRight).toBeLessThanOrEqual(pictureLeft + 0.01);
+	});
+
+	it('adds a title card you can edit, and keeps Hold still under a Look', async () => {
+		const user = userEvent.setup();
+		const api = client();
+		render(Editor, { client: api.client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.click(screen.getByRole('button', { name: 'Add card' }));
+
+		expect(await screen.findByRole('button', { name: '1. Title' })).toBeTruthy();
+		expect(screen.queryByRole('button', { name: 'Replace' })).toBeNull();
+		const title = screen.getByRole('textbox', { name: 'Title' }) as HTMLInputElement;
+		expect(title.value).toBe('Title');
+		const plansBefore = api.plans.length;
+		await user.clear(title);
+		await user.type(title, 'Opening');
+		expect(title.value).toBe('Opening');
+		expect(screen.getByRole('button', { name: '1. Title' })).toBeTruthy();
+		expect(api.plans.length).toBe(plansBefore);
+
+		await user.tab();
+		expect(screen.getByRole('button', { name: '1. Opening' })).toBeTruthy();
+		expect(api.plans.at(-1)?.slots?.[0].card).toMatchObject({ title: 'Opening' });
+
+		const textColor = screen.getByLabelText('Text color') as HTMLInputElement;
+		const background = screen.getByLabelText('Background color') as HTMLInputElement;
+		expect(textColor.type).toBe('color');
+		expect(background.type).toBe('color');
+		expect(textColor.closest('span')?.className).toContain('border');
+		expect(textColor.parentElement?.textContent).toContain('#FFFFFF');
+		expect(background.parentElement?.textContent).toContain('#000000');
+
+		await user.click(screen.getByRole('button', { name: 'Photo film' }));
+		const move = screen.getByRole('combobox', { name: 'Move' }) as HTMLSelectElement;
+		expect(move.value).toBe('hold');
+		expect(api.plans.at(-1)?.slots?.[0]).toMatchObject({
+			card: { title: 'Opening' },
+			mode: 'hold'
+		});
 	});
 });
 

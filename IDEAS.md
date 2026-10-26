@@ -706,8 +706,10 @@ A Document is the file after defaults and flag overrides. A Plan is the
 resolved timeline: song length, video duration, and each slot's source,
 mode, family, clip extent, opaque range, fill zoom, far zoom, and join
 start and midpoint. A Command is one argv array plus a stage name (`filters`,
-`probe`, `canvas`, `clip`, `join`, `mux`). Bash and `renderPlan` are two
-formatters of that array list. Exec consumes the same list.
+`probe`, `canvas`, `clip`, `join`, `mux`), or a `card` stage that writes a
+PNG from bytes on the command. Bash and `renderPlan` are two formatters of
+that list. Exec consumes the same list. `renderPlan` puts card PNGs in
+`files` (path to base64) and keeps `commands` as ffmpeg argv.
 
 Packages, in dependency order. Later ones import earlier ones.
 
@@ -724,9 +726,10 @@ Packages, in dependency order. Later ones import earlier ones.
 | `v1/motion` | Built-in catalog, project modes, segment expansion, zoom `limit`. |
 | `v1/check` | The rule table. `scan` skips `reveal` and still runs the rest. |
 | `v1/plan` | The only orchestrator. |
-| `v1/compile` | Plan to commands, including an `xfade` batch split. |
-| `v1/export` | Bash and `renderPlan` JSON. |
-| `v1/run` | Exec the argv list from the project directory. Stop on the first failure and keep stderr. |
+| `v1/card` | Paint a title or credits card to an image. Liberation Sans and Serif are embedded. |
+| `v1/compile` | Plan to commands, including an `xfade` batch split. A card slot is a PNG write plus a clip that reads it. |
+| `v1/export` | Bash and `renderPlan` JSON. Card PNGs are base64 in the script and in `files`. |
+| `v1/run` | Exec the argv list from the project directory, and write `card` PNG bytes. Stop on the first failure and keep stderr. |
 
 A new timing policy, join type, or easing is a row in the table that already
 exists. A new built-in mode is a catalog entry. A new export is another
@@ -1065,12 +1068,13 @@ once. A new file appearing in a folder does not reorder anything.
 
 The timeline is labeled Timeline. Black rails on the top and bottom carry a
 repeating row of sprocket holes, so the strip reads as film. The holes are
-fixed to the strip. Each picture appears in the band between the rails as
+fixed to the strip. Each picture or card appears in the band between the rails as
 soon as it is added, at an equal width. The block shows a thumbnail, and its number
 when the block is wide enough. The same thumbnail sits beside the name in
-the list. The file name is the block's tooltip. Thumbnails are
-`POST /v1/thumbnail`: the client names a path and a pixel size, and the
-reply is a base64 JPEG of exactly that size, cover-cropped. When the song
+the list. The file name, or the card's title, is the block's tooltip. Thumbnails are
+`POST /v1/thumbnail`: the client names a path or a card and a pixel size, and the
+reply is a base64 JPEG of exactly that size. A photograph is cover-cropped. A
+card is painted to that box. When the song
 is known, the blocks take their clip lengths, a darker band marks each
 dissolve, and the axis runs from 0:00 to the film's length. Selecting a
 row outlines that block. A press that does not travel selects that row.
@@ -1085,6 +1089,36 @@ picture's file. Shuffle pictures reorders the list once. Shuffle moves
 assigns each picture one move from the Look's list. Both write the result
 into the slots. Neither draws zoom numbers, and neither changes again on
 the next open.
+
+### Title and credit cards
+
+A card is a slot. It has an order, a length, a dissolve, and a move, the
+same way a photograph does. The Montage stores the text and the style, not
+a PNG path. Save is still the only write into the project folder. At render
+the engine paints a canvas-sized PNG (`work/card-N.png`) and feeds that
+still to the existing canvas/clip/join/mux path. Thumbnails are the same
+paint, JPEG, through `POST /v1/thumbnail` with `{card, width, height}`
+instead of `{path, width, height}`. There is no `drawtext`, no ASS, and no
+special ffmpeg.
+
+The editor's **Add card** appends a title card: title "Title", Hold still,
+center, middle, medium, bold, sans, white on black. The selected card shows
+title, optional subtitle, optional third line, and a credits list (one
+line per entry). Placement is align left/center/right and vertical
+upper/middle/lower. Size is small/medium/large. Weight is regular/bold.
+Face is sans or serif, from fonts shipped in the app (Liberation, SIL OFL).
+Text color and background are `#RRGGBB`, shown as bordered swatches. The title,
+subtitle, third line, and credits update the card when the field is left, so
+the thumbnail is not painted on every key. An optional faint box sits behind the
+text. Replace is off: there is no photograph to swap. Remove, move, length,
+dissolve, and the move menu stay on. Drift up is the credits roll for a
+tall list. Applying a Look, and Shuffle moves, leave a card on Hold still
+so Classic does not zoom the letters. The user can still pick Drift up.
+The timeline block uses the title (or the first credit line) and the
+painted thumbnail.
+
+Leave out of version 1: per-letter styling, arbitrary x/y, shadows,
+outlines, a font file picker, and columns beyond a single credits line.
 
 Looks are Classic, Photo film, and Quick slides. Classic is selected for a
 new project. Applying a Look writes its defaults, a mode on every

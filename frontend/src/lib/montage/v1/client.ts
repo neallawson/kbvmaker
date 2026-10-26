@@ -10,12 +10,28 @@ export class RuleError extends Error {
 	}
 }
 
+export interface Card {
+	title?: string;
+	subtitle?: string;
+	line?: string;
+	credits?: string[];
+	align?: 'left' | 'center' | 'right';
+	vAlign?: 'upper' | 'middle' | 'lower';
+	size?: 'small' | 'medium' | 'large';
+	weight?: 'regular' | 'bold';
+	face?: 'sans' | 'serif';
+	color?: string;
+	fill?: string;
+	box?: boolean;
+}
+
 export interface Plan {
 	montage: number;
 	song?: number;
 	duration: number;
 	slots: {
-		src: string;
+		src?: string;
+		card?: Card;
 		clipStart?: number;
 		clipDur: number;
 		join?: { type: string; duration: number };
@@ -31,7 +47,8 @@ export interface Backdrop {
 }
 
 export interface Picture {
-	src: string;
+	src?: string;
+	card?: Card;
 	mode?: string;
 	dur?: number;
 }
@@ -65,6 +82,8 @@ export interface Client {
 	render(path: string): Promise<void>;
 	/** thumb is a data URL for a JPEG of exactly width by height. */
 	thumb(path: string, width: number, height: number): Promise<string>;
+	/** thumbCard paints a title or credits card to that same JPEG size. */
+	thumbCard(card: Card, width: number, height: number): Promise<string>;
 }
 
 export function createClient(fetchImpl: typeof fetch = fetch, base = ''): Client {
@@ -98,6 +117,14 @@ export function createClient(fetchImpl: typeof fetch = fetch, base = ''): Client
 				fetchImpl,
 				`${base}/v1/thumbnail`,
 				jsonBody({ path, width, height })
+			);
+			return `data:${body.type};base64,${body.data}`;
+		},
+		async thumbCard(card, width, height) {
+			const body = await readJSON<{ type: string; data: string }>(
+				fetchImpl,
+				`${base}/v1/thumbnail`,
+				jsonBody({ card, width, height })
 			);
 			return `data:${body.type};base64,${body.data}`;
 		}

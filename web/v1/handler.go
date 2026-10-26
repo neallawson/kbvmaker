@@ -12,6 +12,7 @@ import (
 	"os"
 
 	engine "kbvmaker/v1"
+	"kbvmaker/v1/card"
 	"kbvmaker/v1/compile"
 	"kbvmaker/v1/doc"
 	"kbvmaker/v1/media"
@@ -67,9 +68,10 @@ func (h Handler) audio(w http.ResponseWriter, r *http.Request) {
 }
 
 type thumbRequest struct {
-	Path   string `json:"path"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
+	Path   string    `json:"path"`
+	Card   *doc.Card `json:"card"`
+	Width  int       `json:"width"`
+	Height int       `json:"height"`
 }
 
 func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
@@ -77,22 +79,38 @@ func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
 	if !decodeRequest(w, r, &req) {
 		return
 	}
-	if req.Path == "" {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "path"))
+	hasPath := req.Path != ""
+	hasCard := req.Card != nil
+	if hasPath == hasCard {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "path or card"))
 		return
 	}
 	if req.Width < 1 || req.Height < 1 || req.Width > media.ThumbMax || req.Height > media.ThumbMax {
 		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "thumbnail size %dx%d", req.Width, req.Height))
 		return
 	}
-	makeThumb := h.Thumb
-	if makeThumb == nil {
-		makeThumb = media.Thumbnail
-	}
-	jpeg, err := makeThumb(r.Context(), req.Path, req.Width, req.Height)
-	if err != nil {
-		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "image %s", req.Path))
-		return
+	var jpeg []byte
+	var err error
+	if hasCard {
+		if err := req.Card.Finish(0); err != nil {
+			writeRule(w, http.StatusBadRequest, err)
+			return
+		}
+		jpeg, err = card.JPEG(*req.Card, req.Width, req.Height)
+		if err != nil {
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "card thumbnail"))
+			return
+		}
+	} else {
+		makeThumb := h.Thumb
+		if makeThumb == nil {
+			makeThumb = media.Thumbnail
+		}
+		jpeg, err = makeThumb(r.Context(), req.Path, req.Width, req.Height)
+		if err != nil {
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "image %s", req.Path))
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"type":   "image/jpeg",

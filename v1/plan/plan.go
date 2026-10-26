@@ -67,6 +67,9 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 		}
 	}
 	for i, s := range slots {
+		if s.Card != nil {
+			continue
+		}
 		path := doc.ResolvePath(d.Dir, s.Src)
 		if err := exists(path); err != nil {
 			gaps = append(gaps, mediaGap{slot: i + 1, msg: fmt.Sprintf("Missing picture %d: %s", i+1, s.Src)})
@@ -114,17 +117,23 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 	images := map[string]media.Info{}
 	for i, s := range slots {
 		w := windows[i]
-		path := doc.ResolvePath(d.Dir, s.Src)
-		info, ok := images[path]
-		if !ok {
-			info, err = probe.Image(ctx, path)
-			if err != nil {
-				return nil, rule.E(i+1, "missing-media", "image %s: %v", s.Src, err)
+		var info media.Info
+		if s.Card != nil {
+			info = media.Info{Width: d.Canvas.Width, Height: d.Canvas.Height}
+		} else {
+			path := doc.ResolvePath(d.Dir, s.Src)
+			var ok bool
+			info, ok = images[path]
+			if !ok {
+				info, err = probe.Image(ctx, path)
+				if err != nil {
+					return nil, rule.E(i+1, "missing-media", "image %s: %v", s.Src, err)
+				}
+				if info.Width < 1 || info.Height < 1 {
+					return nil, rule.E(i+1, "missing-media", "image %s has no displayed size", s.Src)
+				}
+				images[path] = info
 			}
-			if info.Width < 1 || info.Height < 1 {
-				return nil, rule.E(i+1, "missing-media", "image %s has no displayed size", s.Src)
-			}
-			images[path] = info
 		}
 		fit := frame.FitRect(info.Width, info.Height, d.Canvas.Width, d.Canvas.Height)
 		fill := frame.Fill(info.Width, info.Height, d.Canvas.Width, d.Canvas.Height)
@@ -150,7 +159,7 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 			bars = *s.Backdrop
 		}
 		p.Slots = append(p.Slots, model.Slot{
-			Index: i + 1, Src: s.Src, Mode: mode, BasedOn: basedOn, Family: family,
+			Index: i + 1, Src: s.Src, Card: s.Card, Mode: mode, BasedOn: basedOn, Family: family,
 			ClipStart: w.ClipStart, ClipDur: w.ClipDur,
 			OpaqueStart: w.OpaqueStart, OpaqueEnd: w.OpaqueEnd,
 			Fill: fill, Backdrop: modelBackdrop(bars), FarZoom: far, Join: w.Join, Spans: spans, Fit: fit,

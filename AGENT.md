@@ -22,7 +22,7 @@ The CLI, `web/v1`, and the Wails window call `v1`. They do not contain resolutio
 
 The CLI in `cmd/kbvmaker` imports the `v1` facade, `v1/doc` and `v1/model` types, and `web` for `serve`. It does not call `plan`, `compile`, or `run` directly. Its contract is in `CLI.md`: results on stdout or `-o`, progress and errors on stderr, exit codes 0/1/2/3/4/5/130, and `-json` errors shaped like `/v1`. Changing an exit code, a stream, or the JSON shape breaks pipelines. Update `CLI.md` and `cmd/kbvmaker/cli_test.go` with it. The CLI does not create or edit documents yet. That waits on moving the editor's document operations from `frontend/src/lib/montage/v1/document.ts` into Go.
 
-Probing media and executing ffmpeg are the only edges. Packages between them take and return values.
+Probing media and executing ffmpeg are the only edges. Packages between them take and return values. A title or credits card is a slot with `card` instead of `src`. `v1/card` paints the PNG. Compile puts those bytes on `Command.Body`; run writes `work/card-N.png`; export puts base64 in the bash script and in `renderPlan` `files`. Do not call ffmpeg `drawtext`.
 
 | Change | Where it goes |
 | --- | --- |
@@ -47,7 +47,7 @@ Zoom `1.0` means the whole photograph is in frame. Apply rotation metadata befor
 
 ## Tests
 
-`go test ./...` is the Go check. Add a test at the seam you changed: decode, clock, frame, schedule, timing, motion, check, golden argv, or an HTTP handler. `pnpm test` in `frontend/` is the client check. Add a test for a v1 client behavior or a screen you changed.
+`go test ./...` is the Go check. Add a test at the seam you changed: decode, clock, frame, schedule, timing, motion, check, card paint, golden argv, or an HTTP handler. `pnpm test` in `frontend/` is the client check. Add a test for a v1 client behavior or a screen you changed.
 
 The render test in `v1/render_test.go` writes a PNG and a short WAV, renders a hold, and probes the output. Run it when a change can affect ffmpeg filters, size, or duration. It skips when ffmpeg is absent.
 

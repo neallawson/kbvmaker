@@ -1,4 +1,4 @@
-import type { MontageFile, Picture } from './client';
+import type { Card, MontageFile, Picture } from './client';
 
 export type LookId = 'classic' | 'photo-film' | 'quick-slides';
 
@@ -51,7 +51,10 @@ export function applyLook(file: MontageFile, id: LookId): MontageFile {
 	const look = looks[id];
 	const pacedBySong = look.timing.policy === 'fit-audio' && !!file.audio;
 	const slots = (file.slots ?? []).map((slot, index) => {
-		const next: Picture = { ...slot, mode: look.cycle[index % look.cycle.length] };
+		const next: Picture = {
+			...slot,
+			mode: isCard(slot) ? 'hold' : look.cycle[index % look.cycle.length]
+		};
 		if (!pacedBySong && look.timing.policy !== 'fit-audio') {
 			delete next.dur;
 		}
@@ -88,6 +91,43 @@ export function addPictures(file: MontageFile, paths: string[]): MontageFile {
 		slots.push({ src, mode: modeForNewPicture(file, slots.length) });
 	}
 	return { ...file, slots };
+}
+
+/** addCard appends a title card. Hold still keeps the letters sharp. */
+export function addCard(file: MontageFile): MontageFile {
+	const slots = [...(file.slots ?? [])];
+	slots.push({ card: { title: 'Title' }, mode: 'hold' });
+	return { ...file, slots };
+}
+
+export function isCard(slot: Picture | undefined): boolean {
+	return !!slot?.card;
+}
+
+/** slotLabel is the timeline and list name. */
+export function slotLabel(slot: Picture | undefined): string {
+	if (!slot) {
+		return '';
+	}
+	if (slot.card) {
+		const title = slot.card.title?.trim();
+		if (title) {
+			return title;
+		}
+		const credit = slot.card.credits?.find((line) => line.trim());
+		if (credit) {
+			return credit.trim();
+		}
+		return 'Card';
+	}
+	return baseName(slot.src ?? '');
+}
+
+export function setCard(file: MontageFile, index: number, card: Card): MontageFile {
+	return {
+		...file,
+		slots: (file.slots ?? []).map((slot, i) => (i === index ? { ...slot, card } : slot))
+	};
 }
 
 /** moveChoices is every built-in move, plus a picture's current move when the file named another one. */
@@ -489,7 +529,7 @@ export function blocksFromLengths(srcs: string[], lengths: number[], dissolve: n
 
 export function sortByName(file: MontageFile): MontageFile {
 	const slots = [...(file.slots ?? [])].sort((a, b) =>
-		baseName(a.src).localeCompare(baseName(b.src), undefined, { numeric: true })
+		slotLabel(a).localeCompare(slotLabel(b), undefined, { numeric: true })
 	);
 	return { ...file, slots };
 }
@@ -509,7 +549,7 @@ export function shuffleMoves(file: MontageFile, random: () => number = Math.rand
 		...file,
 		slots: (file.slots ?? []).map((slot) => ({
 			...slot,
-			mode: pool[Math.floor(random() * pool.length)]
+			mode: isCard(slot) ? 'hold' : pool[Math.floor(random() * pool.length)]
 		}))
 	};
 }
@@ -535,7 +575,7 @@ export function relativize(file: MontageFile, dir: string): MontageFile {
 		...file,
 		audio: file.audio ? rel(file.audio) : file.audio,
 		output: file.output?.file ? { ...file.output, file: rel(file.output.file) } : file.output,
-		slots: file.slots?.map((slot) => ({ ...slot, src: rel(slot.src) }))
+		slots: file.slots?.map((slot) => (slot.card ? slot : { ...slot, src: rel(slot.src ?? '') }))
 	};
 }
 
@@ -552,22 +592,22 @@ export interface DragBlock extends ScoreBlock {
 
 /** scoreBlocks lays out the pictures already added. A plan replaces equal widths with clip lengths. */
 export function scoreBlocks(
-	slots: { src: string }[] | undefined,
-	plan: { duration: number; slots: { src: string; clipStart?: number; clipDur: number }[] } | null
+	slots: Picture[] | undefined,
+	plan: { duration: number; slots: { src?: string; clipStart?: number; clipDur: number }[] } | null
 ): ScoreBlock[] {
 	const list = slots ?? [];
 	if (!list.length) {
 		return [];
 	}
 	if (plan && plan.duration > 0 && plan.slots.length === list.length) {
-		return plan.slots.map((slot) => ({
-			src: slot.src,
+		return plan.slots.map((slot, index) => ({
+			src: slotLabel(list[index]) || slot.src || '',
 			left: ((slot.clipStart ?? 0) / plan.duration) * 100,
 			width: (slot.clipDur / plan.duration) * 100
 		}));
 	}
 	const width = 100 / list.length;
-	return list.map((slot, index) => ({ src: slot.src, left: index * width, width }));
+	return list.map((slot, index) => ({ src: slotLabel(slot), left: index * width, width }));
 }
 
 export interface ScoreJoin {

@@ -27,7 +27,7 @@ func TestFFmpegPrintsOnlyErrorsAndProgress(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range cmds {
-		if c.Stage == "filters" || c.Stage == "probe" {
+		if c.Stage == "filters" || c.Stage == "probe" || len(c.Argv) == 0 {
 			continue
 		}
 		line := strings.Join(c.Argv, " ")

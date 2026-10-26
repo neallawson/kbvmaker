@@ -1,10 +1,12 @@
 package v1_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"image/jpeg"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -163,11 +165,41 @@ func TestThumbnailRejectsABadSize(t *testing.T) {
 		`{"path":"/pics/a.jpg","width":0,"height":18}`,
 		`{"path":"/pics/a.jpg","width":8000,"height":18}`,
 		`{"width":32,"height":18}`,
+		`{"path":"/pics/a.jpg","card":{"title":"X"},"width":32,"height":18}`,
 	} {
 		rec := post(mux, "/v1/thumbnail", body)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("body %s status %d %s", body, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+func TestThumbnailPaintsACard(t *testing.T) {
+	mux := http.NewServeMux()
+	webv1.Handler{Probe: &media.Fake{}, Thumb: func(context.Context, string, int, int) ([]byte, error) {
+		t.Fatal("photograph thumbnailer should not run")
+		return nil, nil
+	}}.Register(mux)
+	rec := post(mux, "/v1/thumbnail", `{"card":{"title":"Greenhouse"},"width":64,"height":36}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	var got struct {
+		Type   string `json:"type"`
+		Width  int    `json:"width"`
+		Height int    `json:"height"`
+		Data   string `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := base64.StdEncoding.DecodeString(got.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := jpeg.Decode(bytes.NewReader(raw))
+	if err != nil || got.Type != "image/jpeg" || got.Width != 64 || got.Height != 36 || img.Bounds().Dx() != 64 {
+		t.Fatalf("reply %+v err %v", got, err)
 	}
 }
 
