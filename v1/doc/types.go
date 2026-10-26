@@ -106,6 +106,8 @@ type Slot struct {
 	Dur      *float64   `json:"dur,omitempty"`
 	Until    *TimePoint `json:"until,omitempty"`
 	Backdrop *Backdrop  `json:"backdrop,omitempty"`
+	// Fixed keeps this slot's index when the editor shuffles or sorts. Render ignores it.
+	Fixed bool `json:"fixed,omitempty"`
 }
 
 // HoldOr returns the slot hold, or def when the slot does not set one.

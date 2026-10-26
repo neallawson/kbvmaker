@@ -1,4 +1,4 @@
-import type { Card, MontageFile, Picture } from './client';
+import type { Card, MontageFile, Slot } from './client';
 
 export type LookId = 'classic' | 'photo-film' | 'quick-slides';
 
@@ -51,7 +51,7 @@ export function applyLook(file: MontageFile, id: LookId): MontageFile {
 	const look = looks[id];
 	const pacedBySong = look.timing.policy === 'fit-audio' && !!file.audio;
 	const slots = (file.slots ?? []).map((slot, index) => {
-		const next: Picture = {
+		const next: Slot = {
 			...slot,
 			mode: isCard(slot) ? 'hold' : look.cycle[index % look.cycle.length]
 		};
@@ -100,12 +100,12 @@ export function addCard(file: MontageFile): MontageFile {
 	return { ...file, slots };
 }
 
-export function isCard(slot: Picture | undefined): boolean {
+export function isCard(slot: Slot | undefined): boolean {
 	return !!slot?.card;
 }
 
 /** slotLabel is the timeline and list name. */
-export function slotLabel(slot: Picture | undefined): string {
+export function slotLabel(slot: Slot | undefined): string {
 	if (!slot) {
 		return '';
 	}
@@ -397,7 +397,7 @@ export function setMode(file: MontageFile, index: number, mode: string): Montage
 	};
 }
 
-/** setDur stores a pin. Null removes it so the picture shares the song again. */
+/** setDur stores a length. Null removes it so the slot shares the clock again. */
 export function setDur(file: MontageFile, index: number, dur: number | null): MontageFile {
 	return {
 		...file,
@@ -405,14 +405,31 @@ export function setDur(file: MontageFile, index: number, dur: number | null): Mo
 	};
 }
 
-function withDur(slot: Picture, dur: number | null): Picture {
+/** setFixed keeps a slot's index during shuffle and sort. False removes the flag. */
+export function setFixed(file: MontageFile, index: number, fixed: boolean): MontageFile {
+	return {
+		...file,
+		slots: (file.slots ?? []).map((slot, i) => {
+			if (i !== index) {
+				return slot;
+			}
+			if (!fixed) {
+				const { fixed: _ignored, ...rest } = slot;
+				return rest;
+			}
+			return { ...slot, fixed: true };
+		})
+	};
+}
+
+function withDur(slot: Slot, dur: number | null): Slot {
 	if (dur == null) {
 		return withoutDur(slot);
 	}
 	return { ...slot, dur };
 }
 
-function withoutDur(slot: Picture): Picture {
+function withoutDur(slot: Slot): Slot {
 	const { dur: _ignored, ...rest } = slot;
 	return rest;
 }
@@ -483,7 +500,7 @@ function clampDelta(left: number, right: number, delta: number, dissolve: number
 	return Math.min(hi, Math.max(lo, delta));
 }
 
-function pinDivider(slots: Picture[], join: number, left: number, right: number): Picture[] {
+function pinDivider(slots: Slot[], join: number, left: number, right: number): Slot[] {
 	const unpinned = slots.filter((slot) => slot.dur == null).length;
 	const leftIsSlack = slots[join].dur == null;
 	const rightIsSlack = slots[join + 1].dur == null;
@@ -528,19 +545,28 @@ export function blocksFromLengths(srcs: string[], lengths: number[], dissolve: n
 }
 
 export function sortByName(file: MontageFile): MontageFile {
-	const slots = [...(file.slots ?? [])].sort((a, b) =>
-		slotLabel(a).localeCompare(slotLabel(b), undefined, { numeric: true })
+	return reorderLoose(file, (loose) =>
+		loose.sort((a, b) => slotLabel(a).localeCompare(slotLabel(b), undefined, { numeric: true }))
 	);
-	return { ...file, slots };
 }
 
+/** shuffleSlots reorders slots that are not fixed. A fixed slot keeps its index. */
 export function shuffleSlots(file: MontageFile, random: () => number = Math.random): MontageFile {
+	return reorderLoose(file, (loose) => {
+		for (let i = loose.length - 1; i > 0; i--) {
+			const j = Math.floor(random() * (i + 1));
+			[loose[i], loose[j]] = [loose[j], loose[i]];
+		}
+		return loose;
+	});
+}
+
+/** reorderLoose runs order on the slots whose place is open, then writes them back into those indexes. */
+function reorderLoose(file: MontageFile, order: (loose: Slot[]) => Slot[]): MontageFile {
 	const slots = [...(file.slots ?? [])];
-	for (let i = slots.length - 1; i > 0; i--) {
-		const j = Math.floor(random() * (i + 1));
-		[slots[i], slots[j]] = [slots[j], slots[i]];
-	}
-	return { ...file, slots };
+	const loose = order(slots.filter((slot) => !slot.fixed));
+	let n = 0;
+	return { ...file, slots: slots.map((slot) => (slot.fixed ? slot : loose[n++])) };
 }
 
 export function shuffleMoves(file: MontageFile, random: () => number = Math.random): MontageFile {
@@ -592,7 +618,7 @@ export interface DragBlock extends ScoreBlock {
 
 /** scoreBlocks lays out the pictures already added. A plan replaces equal widths with clip lengths. */
 export function scoreBlocks(
-	slots: Picture[] | undefined,
+	slots: Slot[] | undefined,
 	plan: { duration: number; slots: { src?: string; clipStart?: number; clipDur: number }[] } | null
 ): ScoreBlock[] {
 	const list = slots ?? [];

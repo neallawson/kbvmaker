@@ -1085,7 +1085,7 @@ dialog opens again in the folder it used last.
 
 The selected row sets the move by its plain name. The menu lists every
 move. The length box is described above. Remove and replace change that
-picture's file. Shuffle pictures reorders the list once. Shuffle moves
+picture's file. Shuffle pictures reorders the slots that are not pinned in place. Sort by name writes names into those same open indexes. A pinned photograph and a pinned card both keep their index. Shuffle moves
 assigns each picture one move from the Look's list. Both write the result
 into the slots. Neither draws zoom numbers, and neither changes again on
 the next open.
@@ -1111,7 +1111,7 @@ Text color and background are `#RRGGBB`, shown as bordered swatches. The title,
 subtitle, third line, and credits update the card when the field is left, so
 the thumbnail is not painted on every key. An optional faint box sits behind the
 text. Replace is off: there is no photograph to swap. Remove, move, length,
-dissolve, and the move menu stay on. Drift up is the credits roll for a
+position pin, dissolve, and the move menu stay on. Drift up is the credits roll for a
 tall list. Applying a Look, and Shuffle moves, leave a card on Hold still
 so Classic does not zoom the letters. The user can still pick Drift up.
 The timeline block uses the title (or the first credit line) and the

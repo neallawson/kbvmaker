@@ -277,6 +277,7 @@ Slot {
   dur?:      number
   until?:    TimePoint
   backdrop?: Backdrop
+  fixed?:    boolean
 }
 
 Card {
@@ -336,7 +337,10 @@ required under `explicit`. Under `fit-audio` it is optional and means that
 picture's length is pinned; slots that omit it share the rest of the song,
 or the rest of `timing.duration` when there is no soundtrack (section 7.1).
 Under `fixed-clip` it is optional and replaces `clip` for that slot only
-(section 7.2). `until` is allowed only under `markers`.
+(section 7.2). `until` is allowed only under `markers`. `fixed` keeps that
+slot's index when the editor shuffles or sorts by name. It applies to a
+photograph and a card the same way. Omit it to let the slot move. Render
+ignores it.
 
 Mode names, including keys of `modes`, match `[a-z0-9]+(-[a-z0-9]+)*`.
 

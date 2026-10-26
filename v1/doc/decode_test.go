@@ -273,6 +273,48 @@ func TestSilentClocks(t *testing.T) {
 	}
 }
 
+func TestFixedSlot(t *testing.T) {
+	d, err := Decode([]byte(`{
+	  "montage": 1,
+	  "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [
+	    {"src": "a.jpg", "mode": "hold", "fixed": true},
+	    {"card": {"title": "End"}, "mode": "hold", "fixed": true}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if !d.Slots[0].Fixed || !d.Slots[1].Fixed {
+		t.Fatalf("fixed %+v %+v", d.Slots[0].Fixed, d.Slots[1].Fixed)
+	}
+
+	open, err := Decode([]byte(`{
+	  "montage": 1,
+	  "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [{"src": "a.jpg", "mode": "hold"}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if open.Slots[0].Fixed {
+		t.Fatal("omitted fixed was set")
+	}
+
+	_, err = Decode([]byte(`{
+	  "montage": 1,
+	  "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [{"src": "a.jpg", "mode": "hold", "fixed": "yes"}]
+	}`))
+	re, ok := rule.As(err)
+	if !ok || re.Code != "bad-number" {
+		t.Fatalf("bad fixed: %v", err)
+	}
+}
+
 func TestDecodeCard(t *testing.T) {
 	d, err := Decode([]byte(`{
 	  "montage": 1,

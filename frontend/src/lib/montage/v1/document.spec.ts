@@ -27,6 +27,7 @@ import {
 	setTimeEach,
 	slotLabel,
 	unlockFilm,
+	setFixed,
 	shuffleMoves,
 	shuffleSlots,
 	songClock,
@@ -128,6 +129,28 @@ describe('project edits', () => {
 		expect(shuffleSlots(file, random).slots?.map((slot) => slot.src)).toEqual(['b.jpg', 'a.jpg', 'c.jpg']);
 		const moves = shuffleMoves(file, () => 0.99).slots?.map((slot) => slot.mode);
 		expect(moves).toEqual(['out-center', 'out-center', 'out-center']);
+	});
+
+	it('keeps a fixed slot in place across repeated shuffles and a sort', () => {
+		let file = addCard(addPictures(newProject(), ['c.jpg', 'a.jpg', 'b.jpg']));
+		file = setFixed(file, 0, true);
+		file = setFixed(file, 3, true);
+		const names = () => file.slots?.map((slot) => slot.card?.title ?? slot.src);
+		file = shuffleSlots(file, () => 0);
+		expect(names()).toEqual(['c.jpg', 'b.jpg', 'a.jpg', 'Title']);
+		file = shuffleSlots(file, () => 0);
+		expect(names()).toEqual(['c.jpg', 'a.jpg', 'b.jpg', 'Title']);
+		file = sortByName(file);
+		expect(names()).toEqual(['c.jpg', 'a.jpg', 'b.jpg', 'Title']);
+		file = setFixed(file, 3, false);
+		expect(file.slots?.[3].fixed).toBeUndefined();
+		file = shuffleSlots(file, () => 0);
+		expect(names()).toEqual(['c.jpg', 'b.jpg', 'Title', 'a.jpg']);
+		file = sortByName(file);
+		expect(names()).toEqual(['c.jpg', 'a.jpg', 'b.jpg', 'Title']);
+		file = setFixed(file, 0, false);
+		file = sortByName(file);
+		expect(names()).toEqual(['a.jpg', 'b.jpg', 'c.jpg', 'Title']);
 	});
 
 	it('shuffles inside the Look’s move list', () => {

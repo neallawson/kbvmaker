@@ -33,7 +33,8 @@ function client(read?: MontageFile): { client: Client; plans: MontageFile[] } {
 						src: slot.src,
 						card: slot.card,
 						mode: slot.mode,
-						dur: slot.dur
+						dur: slot.dur,
+						fixed: slot.fixed
 					}))
 				});
 				return {
@@ -734,6 +735,11 @@ describe('Editor', () => {
 		await user.click(screen.getByRole('button', { name: 'Photo film' }));
 		const move = screen.getByRole('combobox', { name: 'Move' }) as HTMLSelectElement;
 		expect(move.value).toBe('hold');
+		await user.click(screen.getByRole('button', { name: 'Pin position' }));
+		await waitFor(() => expect(api.plans.at(-1)?.slots?.[0].fixed).toBe(true));
+		await user.click(screen.getByRole('button', { name: 'Unpin position' }));
+		await waitFor(() => expect(api.plans.at(-1)?.slots?.[0].fixed).toBeUndefined());
+
 		expect(api.plans.at(-1)?.slots?.[0]).toMatchObject({
 			card: { title: 'Opening' },
 			mode: 'hold'

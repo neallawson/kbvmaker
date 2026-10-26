@@ -46,11 +46,14 @@ export interface Backdrop {
 	src?: string;
 }
 
-export interface Picture {
+/** Slot is one timeline entry. A photograph sets src. A card sets card. Place and time live here. */
+export interface Slot {
 	src?: string;
 	card?: Card;
 	mode?: string;
 	dur?: number;
+	/** fixed keeps this index when the list is shuffled or sorted by name. */
+	fixed?: boolean;
 }
 
 /** MontageFile is the authored project. Derived clip lengths are not fields. */
@@ -68,7 +71,7 @@ export interface MontageFile {
 	timing?: { policy: 'fit-audio' | 'fixed-clip' | 'explicit'; clip?: number; duration?: number };
 	/** moves is the Look's list, in cycle order. Shuffle moves draws from it. */
 	moves?: string[];
-	slots?: Picture[];
+	slots?: Slot[];
 }
 
 export interface Client {

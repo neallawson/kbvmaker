@@ -4,7 +4,7 @@
 	import { Card, CardContent } from '#lib/components/ui/card';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs';
 	import type { Host } from '#lib/platform/host';
-	import { RuleError, type Card as TitleCard, type Client, type MontageFile, type Picture, type Plan } from './client';
+	import { RuleError, type Card as TitleCard, type Client, type MontageFile, type Plan, type Slot } from './client';
 	import {
 		addCard,
 		addPictures,
@@ -40,6 +40,7 @@
 		slotLabel,
 		songClock,
 		setDur,
+		setFixed,
 		setMode,
 		shuffleMoves,
 		shuffleSlots,
@@ -167,7 +168,7 @@
 		const dir = projectDir(filePath);
 		const slots = doc?.slots ?? [];
 		const pending = untrack(() => {
-			const next: { key: string; slot: Picture }[] = [];
+			const next: { key: string; slot: Slot }[] = [];
 			const seen = new Set<string>();
 			for (const slot of slots) {
 				const key = thumbKey(slot, dir);
@@ -200,14 +201,14 @@
 		}
 	});
 
-	function thumbKey(slot: Picture, dir = projectDir(filePath)): string {
+	function thumbKey(slot: Slot, dir = projectDir(filePath)): string {
 		if (slot.card) {
 			return `card:${JSON.stringify(slot.card)}`;
 		}
 		return mediaPath(dir, slot.src ?? '');
 	}
 
-	function thumbForSlot(slot: Picture | undefined): string {
+	function thumbForSlot(slot: Slot | undefined): string {
 		return slot ? (thumbs[thumbKey(slot)] ?? '') : '';
 	}
 
@@ -431,7 +432,7 @@
 		edit(setCard(doc, selected, { ...slot.card, ...patch }));
 	}
 
-	function cardText(slot: Picture, field: 'title' | 'subtitle' | 'line' | 'credits'): string {
+	function cardText(slot: Slot, field: 'title' | 'subtitle' | 'line' | 'credits'): string {
 		if (cardDraft) {
 			return cardDraft[field];
 		}
@@ -441,7 +442,7 @@
 		return slot.card?.[field] ?? '';
 	}
 
-	function draftCard(slot: Picture, field: 'title' | 'subtitle' | 'line' | 'credits', value: string) {
+	function draftCard(slot: Slot, field: 'title' | 'subtitle' | 'line' | 'credits', value: string) {
 		cardDraft = {
 			title: slot.card?.title ?? '',
 			subtitle: slot.card?.subtitle ?? '',
@@ -452,7 +453,7 @@
 		};
 	}
 
-	function commitCardText(slot: Picture) {
+	function commitCardText(slot: Slot) {
 		if (!cardDraft || !slot.card) {
 			return;
 		}
@@ -1295,6 +1296,11 @@
 								<div class="flex flex-wrap items-center gap-2">
 									{#if slot.dur != null && (policyOf(doc) === 'fit-audio' || (policyOf(doc) === 'fixed-clip' && !uniformClip(doc)))}
 										<Button variant="outline" onclick={() => edit(setDur(doc!, index, null))}>Remove custom time</Button>
+									{/if}
+									{#if slot.fixed}
+										<Button variant="outline" onclick={() => edit(setFixed(doc!, index, false))}>Unpin position</Button>
+									{:else}
+										<Button variant="outline" onclick={() => edit(setFixed(doc!, index, true))}>Pin position</Button>
 									{/if}
 									{@render pictureAction('Move up', () => edit(moveSlot(doc!, index, -1)), index === 0, 'up')}
 									{@render pictureAction(
