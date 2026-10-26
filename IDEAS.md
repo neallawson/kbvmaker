@@ -1299,3 +1299,72 @@ the enter/exit stills are custom components in the v1 editor.
 
 `/v1` returns the rule error as `{ "slot", "code", "message" }`. Tests cover
 the handlers without a window, and the v1 client and screens without Wails.
+
+## Appendix
+
+### Research into zoom anti-aliasing
+
+Some zooms hitch. The picture sits, then steps. How obvious it is depends
+on the photograph and on how far the zoom travels. This was measured on
+26 October 2026 against ffmpeg `N-123918-gf7ca6f7481-20260411` and left
+out of the renderer. The app still crops the 3840×2160 still straight to
+1920×1080.
+
+A smaller zoom increment per frame, played faster so the film stays the
+same length, does not help. The zoom is already a continuous ramp in
+seconds, one sample per output frame. Extra in-between frames, sped up
+with `setpts` to keep the duration, are the frames a 30 fps render would
+have dropped. The ones that remain land on the same pixel grid.
+
+`zoompan` rounds the crop window to a whole pixel of the still it reads,
+then scales that window to the output. A slow zoom often moves the window
+by less than one pixel between frames, so several frames are identical and
+the next frame jumps. A portrait, a wide photo, and a deeper zoom each
+turn that one-pixel jump into a different amount of the picture.
+
+The canvas is already 3840×2160. Raising `zoompan`'s output size to that
+canvas and scaling back to 1920×1080 with Lanczos copies the same rounded
+window into a larger frame. The downscale does not invent the positions
+between those pixels.
+
+The finer step is to enlarge the still first. At 7680×4320, one rounded
+pixel is half as large on the 1920×1080 frame, and the window moves about
+twice as often. `zoompan` still writes 1920×1080 at 30 fps, so the film
+length stays the same.
+
+A 384×216 grid, zooming from 1 to 1.02 over 2 seconds at 30 fps, shows the
+hold. A 3840×2160 `testsrc2` still, zooming from 1 to 1.15 over 3 seconds,
+shows the cost. Clips were libx264, preset `ultrafast`, CRF 20.
+
+| Path | Time for 3 seconds of video | Longest run of identical frames |
+| --- | --- | --- |
+| Current: crop the 3840×2160 still straight to 1920×1080 | 1.9 s | 8 |
+| `zoompan` at 3840×2160, then Lanczos down to 1920×1080 | 4.6 s | 8 |
+| Scale the still to 7680×4320, then `zoompan` to 1920×1080 | 3.6 s | 4 |
+
+The middle path took about 2.4 times the clip work and kept the 8-frame
+hold. The last path took about 1.9 times the clip work and cut that hold
+to 4 frames. The three files were the same size, about 7 MB for that
+3-second sample.
+
+On a real film the clip stage would grow by about that much. Joins, the
+soundtrack mux, the 1920×1080 size, the frame rate, and the duration would
+stay as they are. A render that spends most of its time in the clips gets
+close to twice as slow. A render with many dissolves spends more of its
+time joining those clips, so the whole job grows by less. An 8K frame is
+about 128 MB of RGBA. Another doubling, to 15360×8640, would halve the
+remaining step again and push a frame toward 500 MB.
+
+The shots that would improve are the slow ones: a long center zoom, a
+portrait that only creeps, fine detail such as foliage, brick, and hair.
+A zoom that already moves at least one canvas pixel per frame would look
+the same. The photograph would not get sharper. A small image fitted up
+to the canvas is already soft, and enlarging it again only refines the
+motion. Lanczos, which the canvas fit already uses, can leave a faint
+halo on a hard edge. A drifting card would get the same smaller step. A
+card that holds still would be unchanged.
+
+Other ideas that were set aside with this one: 60 fps makes the jumps
+more frequent and leaves their size alone. Easing makes the slow ends
+sit on one pixel for longer. Frame blending and motion interpolation
+smear the step and read as softness on a photograph.
