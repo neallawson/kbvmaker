@@ -12,7 +12,7 @@ type Document struct {
 	Canvas   Canvas    `json:"canvas"`
 	Output   Output    `json:"output"`
 	Defaults Defaults  `json:"defaults"`
-	Audio    string    `json:"audio"`
+	Tracks   []Track   `json:"tracks,omitempty"`
 	Dir      string    `json:"-"`
 	Timing   Timing    `json:"timing"`
 	Pool     *Pool     `json:"pool,omitempty"`
@@ -20,6 +20,12 @@ type Document struct {
 	Modes    ModeMap   `json:"modes,omitempty"`
 	Moves    []string  `json:"moves,omitempty"`
 	Slots    []Slot    `json:"slots,omitempty"`
+}
+
+// Track is one file on the soundtrack. Gap is the silence before it, in seconds.
+type Track struct {
+	Src string  `json:"src"`
+	Gap float64 `json:"gap,omitempty"`
 }
 
 // Canvas is the working still.

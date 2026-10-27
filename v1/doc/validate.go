@@ -38,8 +38,13 @@ func (d *Document) ValidateShape() error {
 	if d.Montage != 1 {
 		return rule.E(0, "bad-number", "montage version %d", d.Montage)
 	}
-	if IsURL(d.Audio) {
-		return rule.E(0, "missing-field", "audio")
+	for i, t := range d.Tracks {
+		if t.Src == "" || IsURL(t.Src) {
+			return rule.E(0, "missing-field", "track %d", i+1)
+		}
+		if t.Gap < 0 {
+			return rule.E(0, "bad-number", "track %d gap %v", i+1, t.Gap)
+		}
 	}
 	if d.Defaults.Join.Type != "fade" {
 		return rule.E(0, "unknown-field", "join type %q", d.Defaults.Join.Type)
@@ -80,7 +85,7 @@ func (d *Document) ValidateShape() error {
 		if d.Timing.Duration <= 0 {
 			return rule.E(0, "bad-number", "timing.duration %v", d.Timing.Duration)
 		}
-		if d.Audio != "" {
+		if len(d.Tracks) > 0 {
 			return rule.E(0, "bad-time", "a soundtrack and a film length cannot both set the clock")
 		}
 	}
@@ -163,8 +168,8 @@ func validateMoves(d *Document) error {
 }
 
 func (d *Document) ready() error {
-	if d.Audio == "" && d.needsAudio() {
-		return rule.E(0, "missing-field", "audio")
+	if len(d.Tracks) == 0 && d.needsAudio() {
+		return rule.E(0, "missing-field", "tracks")
 	}
 	if len(d.Slots) == 0 && d.Pool == nil {
 		return rule.E(0, "missing-field", "slots or pool")
@@ -203,7 +208,7 @@ func (d *Document) pins() error {
 }
 
 func clockName(d *Document) string {
-	if d.Audio == "" {
+	if len(d.Tracks) == 0 {
 		return "film"
 	}
 	return "song"

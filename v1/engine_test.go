@@ -23,7 +23,7 @@ func TestResolveCompileAndExports(t *testing.T) {
 	}
 	body := `{
 	  "montage": 1,
-	  "audio": "song.mp3",
+	  "tracks": [{"src": "song.mp3"}],
 	  "slots": [
 	    {"src": "a.jpg", "mode": "out-center"},
 	    {"src": "b.jpg", "mode": "in-left-right"}
@@ -119,7 +119,7 @@ func TestBatchJoins(t *testing.T) {
 	}
 	body := `{
 	  "montage": 1,
-	  "audio": "song.mp3",
+	  "tracks": [{"src": "song.mp3"}],
 	  "defaults": {"hold": 0.2, "join": {"type": "fade", "duration": 0.4}},
 	  "slots": [
 	    {"src": "a.jpg", "mode": "hold"},

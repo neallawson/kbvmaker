@@ -22,7 +22,7 @@ import (
 
 const pieceJSON = `{
   "montage": 1,
-  "audio": "song.wav",
+  "tracks": [{"src": "song.wav"}],
   "slots": [
     {"src": "a.jpg", "mode": "in-center"},
     {"src": "b.jpg", "mode": "out-center", "dur": 3}
@@ -351,8 +351,13 @@ func TestAudioOverrideIsRelativeToTheCurrentDirectory(t *testing.T) {
 	r := p.run(t, "plan", "--audio", "other.wav", "piece.montage.json")
 	expectCode(t, r, exitOK)
 	plan := planOf(t, r.stdout)
-	if plan["audio"] != filepath.Join(p.dir, "other.wav") || plan["duration"] != 10.0 {
-		t.Fatalf("audio %v duration %v", plan["audio"], plan["duration"])
+	tracks, _ := plan["tracks"].([]any)
+	if len(tracks) != 1 || plan["duration"] != 10.0 {
+		t.Fatalf("tracks %v duration %v", plan["tracks"], plan["duration"])
+	}
+	first, _ := tracks[0].(map[string]any)
+	if first["src"] != filepath.Join(p.dir, "other.wav") {
+		t.Fatalf("src %v", first["src"])
 	}
 }
 

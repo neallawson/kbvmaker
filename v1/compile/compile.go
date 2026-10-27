@@ -66,10 +66,18 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 	}
 	var cmds []Command
 	cmds = append(cmds, Command{Stage: "filters", Argv: []string{opt.FFmpeg, "-hide_banner", "-filters"}})
-	if p.Audio != "" {
+	for _, t := range p.Tracks {
 		cmds = append(cmds, Command{Stage: "probe", Argv: []string{
-			opt.FFProbe, "-v", "error", "-show_entries", "format=duration", "-of", "json", p.Audio,
+			opt.FFProbe, "-v", "error", "-show_entries", "format=duration", "-of", "json", t.Src,
 		}})
+	}
+	audio := ""
+	if len(p.Tracks) == 1 && p.Tracks[0].Gap == 0 {
+		audio = p.Tracks[0].Src
+	} else if len(p.Tracks) > 0 {
+		mix := soundtrackCommand(p, opt)
+		cmds = append(cmds, mix)
+		audio = filepath.Join(opt.Work, "soundtrack.wav")
 	}
 	canvasOf := map[string]string{}
 	n := 0
@@ -140,8 +148,8 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 		video = final.path
 	}
 	mux := append(opt.ffmpeg(), "-i", video)
-	if p.Audio != "" {
-		mux = append(mux, "-i", p.Audio,
+	if audio != "" {
+		mux = append(mux, "-i", audio,
 			"-map", "0:v:0", "-map", "1:a:0",
 			"-c:v", "copy", "-c:a", p.Output.AudioCodec, "-b:a", strconv.Itoa(p.Output.AudioBitrate),
 			"-shortest")
@@ -151,6 +159,29 @@ func Commands(p *model.Plan, opt Options) ([]Command, error) {
 	mux = append(mux, "-movflags", "+faststart", p.OutputFile)
 	cmds = append(cmds, Command{Stage: "mux", Argv: mux})
 	return cmds, nil
+}
+
+// soundtrackCommand concatenates the files and the silences before them into one wav.
+func soundtrackCommand(p *model.Plan, opt Options) Command {
+	args := opt.ffmpeg()
+	var filter strings.Builder
+	labels := make([]string, 0, len(p.Tracks)*2)
+	input := 0
+	for i, t := range p.Tracks {
+		if t.Gap > 0 {
+			label := fmt.Sprintf("g%d", i)
+			fmt.Fprintf(&filter, "anullsrc=r=48000:cl=stereo,atrim=0:%s,asetpts=PTS-STARTPTS[%s];", num(t.Gap), label)
+			labels = append(labels, "["+label+"]")
+		}
+		args = append(args, "-i", t.Src)
+		label := fmt.Sprintf("a%d", i)
+		fmt.Fprintf(&filter, "[%d:a]aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS[%s];", input, label)
+		labels = append(labels, "["+label+"]")
+		input++
+	}
+	fmt.Fprintf(&filter, "%sconcat=n=%d:v=0:a=1[a]", strings.Join(labels, ""), len(labels))
+	args = append(args, "-filter_complex", filter.String(), "-map", "[a]", "-c:a", "pcm_s16le", filepath.Join(opt.Work, "soundtrack.wav"))
+	return Command{Stage: "soundtrack", Argv: args}
 }
 
 func canvasKey(s model.Slot) string {

@@ -36,8 +36,8 @@ func TestResolveFixedClipWithoutAudio(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Audio != "" || p.Song != 0 {
-		t.Fatalf("audio %q song %v", p.Audio, p.Song)
+	if len(p.Tracks) != 0 || p.Song != 0 {
+		t.Fatalf("tracks %d song %v", len(p.Tracks), p.Song)
 	}
 	if math.Abs(p.Duration-12) > 1e-9 {
 		t.Fatalf("duration %v", p.Duration)
@@ -90,7 +90,7 @@ func TestResolveFitAudioWithoutAClock(t *testing.T) {
 	}
 	_, err = Resolve(context.Background(), d, &media.Fake{})
 	re, ok := rule.As(err)
-	if !ok || re.Code != "missing-field" || re.Msg != "audio" {
+	if !ok || re.Code != "missing-field" || re.Msg != "tracks" {
 		t.Fatalf("error %+v", err)
 	}
 }

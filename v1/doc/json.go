@@ -83,7 +83,7 @@ func allow(raw map[string]json.RawMessage, keys ...string) error {
 	}
 	for k := range raw {
 		if _, yes := ok[k]; !yes {
-			return rule.E(0, "unknown-field", "unknown field %q", k)
+			return unsupportedField(k)
 		}
 	}
 	return nil

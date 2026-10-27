@@ -34,7 +34,7 @@ func TestPlan(t *testing.T) {
 	docPath := filepath.Join(dir, "piece.montage.json")
 	body := `{
 	  "montage": 1,
-	  "audio": "song.mp3",
+	  "tracks": [{"src": "song.mp3"}],
 	  "slots": [{"src": "a.jpg", "mode": "hold"}]
 	}`
 	if err := os.WriteFile(docPath, []byte(body), 0o644); err != nil {
@@ -94,7 +94,7 @@ func TestDocumentRoundTripAndPlanBody(t *testing.T) {
 
 	body := `{
 	  "montage": 1,
-	  "audio": "song.mp3",
+	  "tracks": [{"src": "song.mp3"}],
 	  "slots": [
 	    {"src": "a.jpg", "mode": "hold", "dur": 8},
 	    {"src": "b.jpg", "mode": "in-center"}
@@ -247,6 +247,25 @@ func post(mux *http.ServeMux, path, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	mux.ServeHTTP(rec, req)
 	return rec
+}
+
+func TestDocumentNamesAnUnknownField(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.montage.json")
+	if err := os.WriteFile(path, []byte(`{"montage":1,"audio":"song.mp3"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(map[string]string{"document": path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	webv1.Handler{Probe: &media.Fake{}}.Register(mux)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/document", bytes.NewReader(payload))
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"message":"Bad Montage File Format: contains unsupported \"audio\" field"`) {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestPlanRejectsAMissingDocument(t *testing.T) {

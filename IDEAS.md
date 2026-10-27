@@ -369,7 +369,7 @@ frame size. They are part of the project and outside the motion language.
     "hold": 1.0,
     "zoomSpan": 0.4
   },
-  "audio": "Love_Ruins-Greenhouse.mp3",
+  "tracks": [{"src": "Love_Ruins-Greenhouse.mp3"}],
   "timing": { "policy": "fit-audio" },
   "slots": [
     { "src": "Greenhouse3.jpg", "mode": "out-center" },
@@ -1079,9 +1079,31 @@ is known, the blocks take their clip lengths, a darker band marks each
 dissolve, and the axis runs from 0:00 to the film's length. Selecting a
 row outlines that block. A press that does not travel selects that row.
 Dragging a picture reorders it, and dragging the grip in a dissolve
-changes the two lengths, as described under Timeline editing. The song's
-length, in minutes:seconds and in seconds, sits beside its name. A file
+changes the two lengths, as described under Timeline editing. The soundtrack's
+length, in minutes:seconds and in seconds, sits beside the track list. A file
 dialog opens again in the folder it used last.
+
+The soundtrack is `tracks`, an ordered list of `{src, gap?}`. `gap` is
+seconds of silence before that file. There is no `audio` field. The song
+length is the sum of the file durations and those silences. `fit-audio`
+divides the pictures across that length, so pictures keep playing through a
+silence. Render concatenates the files and the silences into
+`work/soundtrack.wav` when there is more than one file or any silence, then
+muxes that one stream. One file and no silence is muxed directly. `-audio`
+on one run replaces the list with that single file.
+
+Under the picture strip, a soundtrack lane uses the same axis. Drag a file
+to reorder it. The grip where a later file begins sets the silence before
+it. Move soundtrack up, Move soundtrack down, Replace soundtrack, and Remove
+soundtrack do the same work from the selected row. **Silence before** is the
+typed form of the grip.
+
+A long film keeps time-proportional widths. The lanes scroll together so a
+picture stays wide enough to grab. **Film window** is a thin strip of the
+whole film: picture ticks, soundtrack bars, and the open span. Dragging it
+scrolls both lanes. The picture list is one line until the row is selected.
+**Find a picture** jumps to a name. Thumbnails load for the open window and
+the rows on screen.
 
 The selected row sets the move by its plain name. The menu lists every
 move. The length box is described above. Remove and replace change that

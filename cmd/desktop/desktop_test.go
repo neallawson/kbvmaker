@@ -22,7 +22,7 @@ const editorDocument = `{
   "output": {"width": 1920, "height": 1080},
   "defaults": {"join": {"type": "fade", "duration": 1}, "hold": 0.5, "zoomSpan": 0.25, "ease": "linear"},
   "timing": {"policy": "fit-audio"},
-  "audio": "/music/song.mp3"
+  "tracks": [{"src": "/music/song.mp3"}]
 }`
 
 func TestCloseAsksOnlyWhenTheFilmIsUnsaved(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 func TestCanvasFilters(t *testing.T) {
 	canvas := model.Canvas{Width: 320, Height: 180, Backdrop: model.Backdrop{Kind: "blur", Blur: 40}}
 	p := &model.Plan{
-		Audio: "song.mp3", OutputFile: "out.mp4", Canvas: canvas,
+		Tracks: []model.Track{{Src: "song.mp3", Dur: 10}}, OutputFile: "out.mp4", Canvas: canvas,
 		Output: model.Output{Width: 160, Height: 90, FPS: 10, VideoCodec: "libx264", Preset: "ultrafast", CRF: 30, AudioCodec: "aac", AudioBitrate: 128000},
 		Slots: []model.Slot{
 			holdSlot("a.jpg", model.Backdrop{Kind: "color", Color: "#0000FF"}),

@@ -43,7 +43,7 @@ func fitAudio(d *doc.Document, slots []doc.Slot, song float64) ([]float64, []flo
 	}
 	n := len(slots)
 	clock := "song"
-	if d.Audio == "" {
+	if len(d.Tracks) == 0 {
 		clock = "film"
 	}
 	if n == 1 {

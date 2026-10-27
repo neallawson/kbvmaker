@@ -9,7 +9,7 @@ import (
 
 const twoSlots = `{
   "montage": 1,
-  "audio": "Love_Ruins-Greenhouse.mp3",
+  "tracks": [{"src": "Love_Ruins-Greenhouse.mp3"}],
   "slots": [
     { "src": "Greenhouse3.jpg", "mode": "out-center" },
     { "src": "Greenhouse8.jpg", "mode": "in-left-right" }
@@ -38,7 +38,7 @@ func TestDecodeDefaults(t *testing.T) {
 func TestMoveList(t *testing.T) {
 	d, err := Decode([]byte(`{
 		"montage": 1,
-		"audio": "a.mp3",
+		"tracks": [{"src": "a.mp3"}],
 		"moves": ["in-center", "in-right-left", "in-bottom-top"],
 		"slots": [{ "src": "a.jpg", "mode": "in-right-left" }]
 	}`))
@@ -52,7 +52,7 @@ func TestMoveList(t *testing.T) {
 		t.Fatalf("moves %v", d.Moves)
 	}
 
-	d, err = Decode([]byte(`{"montage":1,"audio":"a.mp3","moves":["nope"]}`))
+	d, err = Decode([]byte(`{"montage":1,"tracks": [{"src": "a.mp3"}],"moves":["nope"]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestMoveList(t *testing.T) {
 		t.Fatalf("unknown move: %v", err)
 	}
 
-	d, err = Decode([]byte(`{"montage":1,"audio":"a.mp3","moves":["hold","hold"]}`))
+	d, err = Decode([]byte(`{"montage":1,"tracks": [{"src": "a.mp3"}],"moves":["hold","hold"]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,12 +74,12 @@ func TestMoveList(t *testing.T) {
 }
 
 func TestRejectsUnknownFieldAndWrongVersion(t *testing.T) {
-	_, err := Decode([]byte(`{"montage":1,"audio":"a.mp3","slots":[],"nope":true}`))
+	_, err := Decode([]byte(`{"montage":1,"tracks": [{"src": "a.mp3"}],"slots":[],"nope":true}`))
 	re, ok := rule.As(err)
 	if !ok || re.Code != "unknown-field" {
 		t.Fatalf("unknown: %v", err)
 	}
-	_, err = Decode([]byte(`{"montage":2,"audio":"a.mp3"}`))
+	_, err = Decode([]byte(`{"montage":2,"tracks": [{"src": "a.mp3"}]}`))
 	re, ok = rule.As(err)
 	if !ok || re.Code != "bad-number" {
 		t.Fatalf("version: %v", err)
@@ -87,7 +87,7 @@ func TestRejectsUnknownFieldAndWrongVersion(t *testing.T) {
 }
 
 func TestRejectsDuplicateKey(t *testing.T) {
-	_, err := Decode([]byte(`{"montage":1,"montage":1,"audio":"a.mp3"}`))
+	_, err := Decode([]byte(`{"montage":1,"montage":1,"tracks": [{"src": "a.mp3"}]}`))
 	re, ok := rule.As(err)
 	if !ok || re.Code != "duplicate-key" {
 		t.Fatalf("dup: %v", err)
@@ -97,7 +97,7 @@ func TestRejectsDuplicateKey(t *testing.T) {
 func TestMotionRoundTrip(t *testing.T) {
 	in := `{
 	  "montage": 1,
-	  "audio": "song.mp3",
+	  "tracks": [{"src": "song.mp3"}],
 	  "slots": [{
 	    "src": "portrait.jpg",
 	    "basedOn": "in-left-right",
@@ -126,7 +126,7 @@ func TestMotionRoundTrip(t *testing.T) {
 func TestBackdropKinds(t *testing.T) {
 	d, err := Decode([]byte(`{
 	  "montage": 1,
-	  "audio": "song.mp3",
+	  "tracks": [{"src": "song.mp3"}],
 	  "canvas": {"backdrop": {"kind": "color", "color": "#0000FF"}},
 	  "slots": [
 	    {"src": "a.jpg", "mode": "hold", "backdrop": {"kind": "pattern", "name": "grain"}},
@@ -145,12 +145,12 @@ func TestBackdropKinds(t *testing.T) {
 	if d.Slots[1].Backdrop != nil {
 		t.Fatal("second slot should inherit the canvas backdrop")
 	}
-	_, err = Decode([]byte(`{"montage":1,"audio":"a.mp3","canvas":{"blur":40,"backdrop":{"kind":"blur"}}}`))
+	_, err = Decode([]byte(`{"montage":1,"tracks": [{"src": "a.mp3"}],"canvas":{"blur":40,"backdrop":{"kind":"blur"}}}`))
 	re, ok := rule.As(err)
 	if !ok || re.Code != "unknown-field" {
 		t.Fatalf("both: %v", err)
 	}
-	_, err = Decode([]byte(`{"montage":1,"audio":"a.mp3","canvas":{"backdrop":{"kind":"pattern","name":"stripes"}}}`))
+	_, err = Decode([]byte(`{"montage":1,"tracks": [{"src": "a.mp3"}],"canvas":{"backdrop":{"kind":"pattern","name":"stripes"}}}`))
 	re, ok = rule.As(err)
 	if !ok || re.Code != "unknown-field" {
 		t.Fatalf("pattern: %v", err)
@@ -173,7 +173,7 @@ func TestDraftOmitsSongAndPictures(t *testing.T) {
 func TestFitAudioRejectsAPinOnEveryPicture(t *testing.T) {
 	d, err := Decode([]byte(`{
 	  "montage": 1,
-	  "audio": "song.mp3",
+	  "tracks": [{"src": "song.mp3"}],
 	  "slots": [
 	    {"src": "a.jpg", "mode": "hold", "dur": 8},
 	    {"src": "b.jpg", "mode": "hold", "dur": 8}
@@ -230,7 +230,7 @@ func TestSilentClocks(t *testing.T) {
 	}
 	both, err := Decode([]byte(`{
 	  "montage": 1,
-	  "audio": "song.mp3",
+	  "tracks": [{"src": "song.mp3"}],
 	  "timing": {"policy": "fit-audio", "duration": 41},
 	  "slots": [{"src": "a.jpg", "mode": "hold"}]
 	}`))
@@ -268,7 +268,7 @@ func TestSilentClocks(t *testing.T) {
 	}
 	err = needsSong.Validate()
 	re, ok = rule.As(err)
-	if !ok || re.Code != "missing-field" || re.Msg != "audio" {
+	if !ok || re.Code != "missing-field" || re.Msg != "tracks" {
 		t.Fatalf("needs song: %v", err)
 	}
 }
@@ -384,5 +384,30 @@ func TestCardRules(t *testing.T) {
 	re, ok = rule.As(err)
 	if !ok || re.Code != "unknown-field" {
 		t.Fatalf("face: %v", err)
+	}
+}
+
+func TestAudioFieldIsUnknown(t *testing.T) {
+	_, err := Decode([]byte(`{"montage":1,"audio":"song.mp3"}`))
+	re, ok := rule.As(err)
+	if !ok || re.Code != "unknown-field" || re.Msg != `Bad Montage File Format: contains unsupported "audio" field` {
+		t.Fatalf("audio: %v", err)
+	}
+}
+
+func TestTrackGapMustNotBeNegative(t *testing.T) {
+	d, err := Decode([]byte(`{
+	  "montage": 1,
+	  "tracks": [{"src": "a.mp3", "gap": -2}],
+	  "timing": {"policy": "fixed-clip", "clip": 5},
+	  "slots": [{"src": "a.jpg", "mode": "hold"}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = d.Validate()
+	re, ok := rule.As(err)
+	if !ok || re.Code != "bad-number" {
+		t.Fatalf("gap: %v", err)
 	}
 }

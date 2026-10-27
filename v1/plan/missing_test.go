@@ -18,7 +18,7 @@ func TestResolveListsEveryMissingAsset(t *testing.T) {
 	}
 	d, err := doc.Decode([]byte(`{
 		"montage": 1,
-		"audio": "song.mp3",
+		"tracks": [{"src": "song.mp3"}],
 		"slots": [
 			{"src": "a.jpg", "mode": "in-center"},
 			{"src": "b.jpg", "mode": "out-center"},
@@ -49,7 +49,7 @@ func TestResolveKeepsTheSlotWhenOnePictureIsMissing(t *testing.T) {
 	}
 	d, err := doc.Decode([]byte(`{
 		"montage": 1,
-		"audio": "song.mp3",
+		"tracks": [{"src": "song.mp3"}],
 		"slots": [
 			{"src": "a.jpg", "mode": "in-center"},
 			{"src": "b.jpg", "mode": "out-center"}

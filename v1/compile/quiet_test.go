@@ -9,7 +9,7 @@ import (
 
 func quietPlan() *model.Plan {
 	p := &model.Plan{
-		Audio: "song.mp3", OutputFile: "out.mp4",
+		Tracks: []model.Track{{Src: "song.mp3", Dur: 10}}, OutputFile: "out.mp4",
 		Canvas: model.Canvas{Width: 320, Height: 180, Backdrop: model.Backdrop{Kind: "blur", Blur: 40}},
 		Output: model.Output{Width: 160, Height: 90, FPS: 10, VideoCodec: "libx264", Preset: "ultrafast", CRF: 30, AudioCodec: "aac", AudioBitrate: 128000},
 		Slots: []model.Slot{
@@ -39,7 +39,7 @@ func TestFFmpegPrintsOnlyErrorsAndProgress(t *testing.T) {
 
 func TestMuxOmitsAudioWhenTheFilmHasNone(t *testing.T) {
 	p := quietPlan()
-	p.Audio = ""
+	p.Tracks = nil
 	cmds, err := Commands(p, Options{})
 	if err != nil {
 		t.Fatal(err)

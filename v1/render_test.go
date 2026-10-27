@@ -50,7 +50,7 @@ func TestGeneratedImageAndShortRender(t *testing.T) {
 	  "montage": 1,
 	  "canvas": {"width": 320, "height": 180, "blur": 2},
 	  "output": {"width": 160, "height": 90, "fps": 10, "preset": "ultrafast", "crf": 30, "file": "out.mp4"},
-	  "audio": "tone.wav",
+	  "tracks": [{"src": "tone.wav"}],
 	  "slots": [{"src": "photo.png", "mode": "hold"}]
 	}`
 	path := filepath.Join(dir, "piece.montage.json")
@@ -102,7 +102,7 @@ func TestColorBackdropPixels(t *testing.T) {
 	  "montage": 1,
 	  "canvas": {"width": 320, "height": 180, "backdrop": {"kind": "color", "color": "#0000FF"}},
 	  "output": {"width": 160, "height": 90, "fps": 10, "preset": "ultrafast", "crf": 30, "file": "out.mp4"},
-	  "audio": "tone.wav",
+	  "tracks": [{"src": "tone.wav"}],
 	  "slots": [{"src": "photo.png", "mode": "hold"}]
 	}`
 	path := filepath.Join(dir, "piece.montage.json")

@@ -197,7 +197,7 @@ func smokeBody(canvas, modes, slots, output string) string {
 		"output": {%s},
 		"defaults": {"hold": 0.1, "join": {"type": "fade", "duration": 0.15}, "zoomSpan": 0.2, "ease": "linear"},
 		"timing": {"policy": "fixed-clip", "clip": 0.4},
-		"audio": "tone.wav"%s,
+		"tracks": [{"src": "tone.wav"}]%s,
 		"slots": [%s]
 	}`, canvas, output, modes, slots)
 }

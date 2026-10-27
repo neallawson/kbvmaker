@@ -32,20 +32,24 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 	var gaps []mediaGap
 	song := 0.0
 	var err error
-	if d.Audio != "" {
-		audio := doc.ResolvePath(d.Dir, d.Audio)
+	placed := make([]model.Track, 0, len(d.Tracks))
+	for _, t := range d.Tracks {
+		audio := doc.ResolvePath(d.Dir, t.Src)
 		if err := exists(audio); err != nil {
-			gaps = append(gaps, mediaGap{msg: fmt.Sprintf("Missing soundtrack: %s", d.Audio)})
-		} else {
-			song, err = probe.Duration(ctx, audio)
-			if err != nil {
-				return nil, rule.E(0, "missing-media", "Cannot read soundtrack: %s", d.Audio)
-			}
-			if song <= 0 {
-				return nil, rule.E(0, "bad-number", "song duration %v", song)
-			}
+			gaps = append(gaps, mediaGap{msg: fmt.Sprintf("Missing soundtrack: %s", t.Src)})
+			continue
 		}
-	} else if d.Timing.Policy == "fit-audio" && d.Timing.HasDuration {
+		dur, err := probe.Duration(ctx, audio)
+		if err != nil {
+			return nil, rule.E(0, "missing-media", "Cannot read soundtrack: %s", t.Src)
+		}
+		if dur <= 0 {
+			return nil, rule.E(0, "bad-number", "song duration %v", dur)
+		}
+		placed = append(placed, model.Track{Src: t.Src, Start: song + t.Gap, Dur: dur, Gap: t.Gap})
+		song += t.Gap + dur
+	}
+	if len(d.Tracks) == 0 && d.Timing.Policy == "fit-audio" && d.Timing.HasDuration {
 		song = d.Timing.Duration
 	}
 	slots := d.Slots
@@ -102,7 +106,7 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 		Song:       song,
 		Duration:   videoDur,
 		Dir:        d.Dir,
-		Audio:      d.Audio,
+		Tracks:     placed,
 		OutputFile: outFile,
 		Canvas: model.Canvas{
 			Width: d.Canvas.Width, Height: d.Canvas.Height,

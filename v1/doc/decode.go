@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"kbvmaker/v1/rule"
@@ -56,10 +57,22 @@ func trailing(dec *json.Decoder) error {
 
 func wrapJSON(err error) error {
 	msg := err.Error()
+	const prefix = "json: unknown field "
+	if field, ok := strings.CutPrefix(msg, prefix); ok {
+		name, err := strconv.Unquote(field)
+		if err != nil {
+			name = field
+		}
+		return unsupportedField(name)
+	}
 	if strings.Contains(msg, "unknown field") {
 		return rule.E(0, "unknown-field", "%s", msg)
 	}
 	return rule.E(0, "bad-number", "%s", msg)
+}
+
+func unsupportedField(name string) error {
+	return rule.E(0, "unknown-field", "Bad Montage File Format: contains unsupported %q field", name)
 }
 
 type rawDoc struct {
@@ -67,7 +80,7 @@ type rawDoc struct {
 	Canvas   *rawCanvas   `json:"canvas"`
 	Output   *rawOutput   `json:"output"`
 	Defaults *rawDefaults `json:"defaults"`
-	Audio    *string      `json:"audio"`
+	Tracks   []Track      `json:"tracks"`
 	Timing   *Timing      `json:"timing"`
 	Pool     *Pool        `json:"pool"`
 	Schedule *Schedule    `json:"schedule"`
@@ -110,10 +123,7 @@ func (r rawDoc) document() (*Document, error) {
 	if *r.Montage != float64(version.Current) {
 		return nil, rule.E(0, "bad-number", "montage version %v", *r.Montage)
 	}
-	d := &Document{Montage: version.Current}
-	if r.Audio != nil {
-		d.Audio = *r.Audio
-	}
+	d := &Document{Montage: version.Current, Tracks: r.Tracks}
 	d.Canvas = Canvas{Width: 3840, Height: 2160, Backdrop: blurBackdrop(40)}
 	if c := r.Canvas; c != nil {
 		if c.Width != nil {
@@ -293,7 +303,7 @@ type Override struct {
 // ApplyOverrides writes flag values onto a decoded document.
 func ApplyOverrides(d *Document, o Override) {
 	if o.Audio != "" {
-		d.Audio = o.Audio
+		d.Tracks = []Track{{Src: o.Audio}}
 	}
 	if o.OutputFile != "" {
 		d.Output.File = o.OutputFile

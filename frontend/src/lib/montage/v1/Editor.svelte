@@ -13,7 +13,9 @@
 		blocksFromLengths,
 		canPlan,
 		clipFromFilm,
-		clearAudio,
+		addTrack,
+		clearTracks,
+		hasSoundtrack,
 		dragLayout,
 		dropIndex,
 		gripHit,
@@ -34,7 +36,11 @@
 		scoreBlocks,
 		scoreJoins,
 		secondsLabel,
-		setAudio,
+		moveTrack,
+		reorderTrack,
+		removeTrack,
+		replaceTrack,
+		setTrackGap,
 		setCard,
 		setTimeEach,
 		slotLabel,
@@ -70,6 +76,17 @@
 	let elapsed = $state(0);
 	let songDraft = $state('');
 	let songSeconds = $state<number | null>(null);
+	let trackSeconds = $state<Record<string, number>>({});
+	let audioIndex = $state<number | null>(null);
+	let gapPreview = $state<number | null>(null);
+	let gapPreviewIndex = $state<number | null>(null);
+	let pictureQuery = $state('');
+	let scrollEl = $state<HTMLDivElement | null>(null);
+	let listEl = $state<HTMLUListElement | null>(null);
+	let viewportWidth = $state(0);
+	let filmScroll = $state(0);
+	let listScroll = $state(0);
+	const minPicturePx = 72;
 	let pictureDraft = $state('');
 	let lengthDraft = $state<string | null>(null);
 	/** cardDraft holds title text until the field is left, so the thumbnail is not painted on every key. */
@@ -87,6 +104,7 @@
 	let reorderHold = $state<ReturnType<typeof settledLayout> | null>(null);
 	let dragArmed = $state(false);
 	let swallowClick = false;
+	let audioSwallow = false;
 	/** scan bumps when the soundtrack and pictures should be read from disk again. */
 	let scan = $state(0);
 	let thumbGen = $state(0);
@@ -141,7 +159,7 @@
 						gripCommit = false;
 					}
 				}
-				if (current.audio && next.song != null) {
+				if (hasSoundtrack(current) && next.song != null) {
 					songSeconds = next.song;
 				}
 				if (errorKind === 'plan') {
@@ -171,10 +189,14 @@
 		const generation = thumbGen;
 		const dir = projectDir(filePath);
 		const slots = doc?.slots ?? [];
+		const visible = visiblePictureSlots();
 		const pending = untrack(() => {
 			const next: { key: string; slot: Slot }[] = [];
 			const seen = new Set<string>();
-			for (const slot of slots) {
+			for (const [index, slot] of slots.entries()) {
+				if (visible && !visible.has(index)) {
+					continue;
+				}
 				const key = thumbKey(slot, dir);
 				if (!key || thumbs[key] || thumbInflight.has(key) || seen.has(key)) {
 					continue;
@@ -204,6 +226,34 @@
 				});
 		}
 	});
+
+	/** visiblePictureSlots is null when the whole film fits, so every thumbnail loads. */
+	function visiblePictureSlots(): Set<number> | null {
+		if (viewportWidth <= 0 || contentWidth <= viewportWidth + 1) {
+			return null;
+		}
+		const set = new Set<number>();
+		const start = filmScroll / contentWidth;
+		const end = (filmScroll + viewportWidth) / contentWidth;
+		for (const block of placed) {
+			const left = block.left / 100;
+			if (left + block.width / 100 > start && left < end) {
+				set.add(block.slot);
+			}
+		}
+		set.add(selected);
+		void listScroll;
+		if (listEl && listEl.clientHeight > 0) {
+			const row = 44;
+			const from = Math.max(0, Math.floor(listEl.scrollTop / row) - 1);
+			const to = Math.ceil((listEl.scrollTop + listEl.clientHeight) / row) + 1;
+			const count = doc?.slots?.length ?? 0;
+			for (let i = from; i <= to && i < count; i++) {
+				set.add(i);
+			}
+		}
+		return set;
+	}
 
 	function thumbKey(slot: Slot, dir = projectDir(filePath)): string {
 		if (slot.card) {
@@ -235,6 +285,9 @@
 		}
 		thumbGen += 1;
 		scan += 1;
+		if (doc.tracks?.length) {
+			void measureTracks(doc.tracks);
+		}
 	}
 
 	$effect(() => {
@@ -329,6 +382,7 @@
 	}
 
 	function start(path: string) {
+		closePreview();
 		filePath = path;
 		doc = newProject();
 		look = 'classic';
@@ -339,7 +393,13 @@
 		plan = null;
 		reorderHold = null;
 		lift = null;
+		preview = null;
+		gripCommit = false;
 		songSeconds = null;
+		trackSeconds = {};
+		audioIndex = null;
+		gapPreview = null;
+		gapPreviewIndex = null;
 		eachDraft = null;
 	}
 
@@ -357,6 +417,7 @@
 		if (!chosen) {
 			return;
 		}
+		start('');
 		try {
 			doc = await client.read(chosen);
 			filePath = chosen;
@@ -367,12 +428,19 @@
 			lengthDraft = null;
 			eachDraft = null;
 			songSeconds = null;
-			clockTab = doc.audio ? 'soundtrack' : 'silent';
-			if (doc.audio) {
-				void measureSong(doc.audio);
+			trackSeconds = {};
+			audioIndex = hasSoundtrack(doc) ? 0 : null;
+			clockTab = hasSoundtrack(doc) ? 'soundtrack' : 'silent';
+			if (hasSoundtrack(doc)) {
+				void measureTracks(doc.tracks ?? []);
 			}
 		} catch (err) {
-			showError(err instanceof RuleError ? err.message : 'Could not open the project');
+			if (err instanceof RuleError && err.code === 'unknown-field') {
+				showError(err.message);
+				return;
+			}
+			const detail = err instanceof RuleError ? err.message : 'Could not open the project';
+			showError(`Could not open ${chosen}: ${detail}`);
 		}
 	}
 
@@ -400,14 +468,29 @@
 		}
 	}
 
-	async function measureSong(path: string) {
-		try {
-			const info = await client.audio(mediaPath(projectDir(filePath), path));
-			songSeconds = info.seconds;
-		} catch (err) {
-			songSeconds = null;
-			showError(err instanceof RuleError ? err.message : 'Could not read the song');
-			errorSlot = 0;
+	async function measureTracks(tracks: { src: string }[]) {
+		const dir = projectDir(filePath);
+		const next = { ...trackSeconds };
+		let failed = false;
+		await Promise.all(
+			tracks.map(async (track) => {
+				const path = mediaPath(dir, track.src);
+				try {
+					const info = await client.audio(path);
+					next[path] = info.seconds;
+				} catch (err) {
+					failed = true;
+					showError(err instanceof RuleError ? err.message : 'Could not read the soundtrack');
+					errorSlot = 0;
+				}
+			})
+		);
+		trackSeconds = next;
+		if (!failed) {
+			songSeconds = (doc?.tracks ?? []).reduce((sum, track) => {
+				const dur = next[mediaPath(dir, track.src)] ?? 0;
+				return sum + (track.gap ?? 0) + dur;
+			}, 0);
 		}
 	}
 
@@ -416,9 +499,23 @@
 		if (!chosen || !doc) {
 			return;
 		}
-		edit(setAudio(doc, chosen, look));
+		const next = addTrack(doc, chosen, look);
+		edit(next);
+		audioIndex = (next.tracks?.length ?? 1) - 1;
 		clockTab = 'soundtrack';
-		await measureSong(chosen);
+		songDraft = '';
+		await measureTracks(next.tracks ?? []);
+	}
+
+	async function replaceSong(path = songDraft) {
+		const chosen = host.pickAudio ? await host.pickAudio() : path;
+		if (!chosen || !doc || audioIndex == null) {
+			return;
+		}
+		const next = replaceTrack(doc, audioIndex, chosen);
+		edit(next);
+		songDraft = '';
+		await measureTracks(next.tracks ?? []);
 	}
 
 	function showSoundtrack() {
@@ -434,9 +531,11 @@
 		if (!doc) {
 			return;
 		}
-		if (doc.audio) {
-			edit(clearAudio(doc, paceKeepingPictures(doc)));
+		if (hasSoundtrack(doc)) {
+			edit(clearTracks(doc, paceKeepingPictures(doc)));
 			songDraft = '';
+			audioIndex = null;
+			trackSeconds = {};
 			songSeconds = null;
 		}
 		clockTab = 'silent';
@@ -548,7 +647,7 @@
 		}
 		const text = raw.trim();
 		if (!text) {
-			if (policyOf(doc) === 'fit-audio' || (policyOf(doc) === 'fixed-clip' && !doc.audio && !uniformClip(doc))) {
+			if (policyOf(doc) === 'fit-audio' || (policyOf(doc) === 'fixed-clip' && !hasSoundtrack(doc) && !uniformClip(doc))) {
 				edit(setDur(doc, selected, null));
 			}
 			return;
@@ -558,7 +657,7 @@
 			showError('Enter a length in seconds', selected + 1);
 			return;
 		}
-		if (!doc.audio && policyOf(doc) === 'fixed-clip' && (doc.slots?.length ?? 0) < 2) {
+		if (!hasSoundtrack(doc) && policyOf(doc) === 'fixed-clip' && (doc.slots?.length ?? 0) < 2) {
 			edit(setTimeEach(doc, n));
 			return;
 		}
@@ -693,6 +792,64 @@
 	});
 	let joins = $derived(scoreJoins(placed));
 
+	function axisSeconds(): number {
+		const film = plan?.duration ?? 0;
+		const sound = plan?.song && plan.song > 0 ? plan.song : measuredSoundtrack();
+		return Math.max(film, sound, 0);
+	}
+
+	function measuredSoundtrack(): number {
+		const dir = projectDir(filePath);
+		return (doc?.tracks ?? []).reduce((sum, track) => {
+			const dur = trackSeconds[mediaPath(dir, track.src)] ?? 0;
+			return sum + (track.gap ?? 0) + dur;
+		}, 0);
+	}
+
+	let audioPlaced = $derived.by(() => {
+		const tracks = doc?.tracks ?? [];
+		if (!tracks.length) {
+			return [];
+		}
+		const axis = axisSeconds();
+		const previewing = gapPreviewIndex != null && gapPreview != null;
+		if (!previewing && plan?.tracks && plan.tracks.length === tracks.length && axis > 0) {
+			return plan.tracks.map((track, index) => ({
+				index,
+				src: baseName(tracks[index]?.src || track.src),
+				left: (track.start / axis) * 100,
+				width: (track.dur / axis) * 100,
+				gap: track.gap ?? tracks[index]?.gap ?? 0
+			}));
+		}
+		const dir = projectDir(filePath);
+		let cursor = 0;
+		const pieces = tracks.map((track, index) => {
+			const dur = trackSeconds[mediaPath(dir, track.src)] || 1;
+			const gap = index === gapPreviewIndex && gapPreview != null ? gapPreview : (track.gap ?? 0);
+			const start = cursor + gap;
+			cursor = start + dur;
+			return { start, dur, gap };
+		});
+		const total = Math.max(cursor, axis, 0.001);
+		return pieces.map((piece, index) => ({
+			index,
+			src: baseName(tracks[index].src),
+			left: (piece.start / total) * 100,
+			width: (piece.dur / total) * 100,
+			gap: piece.gap
+		}));
+	});
+
+	let contentWidth = $derived.by(() => {
+		if (viewportWidth <= 0 || placed.length === 0) {
+			return 0;
+		}
+		const axis = Math.max(axisSeconds(), 0.001);
+		const minClip = Math.min(...placed.map((block) => Math.max((block.width / 100) * axis, 0.001)));
+		return Math.max(viewportWidth / axis, minPicturePx / minClip) * axis;
+	});
+
 	$effect(() => {
 		const el = trackEl;
 		const layout = placed.map((block) => `${block.left}:${block.width}`).join('|');
@@ -718,6 +875,24 @@
 		};
 	});
 
+	$effect(() => {
+		const el = scrollEl;
+		if (!el) {
+			return;
+		}
+		const read = () => {
+			viewportWidth = el.clientWidth;
+			filmScroll = el.scrollLeft;
+		};
+		read();
+		let observer: ResizeObserver | undefined;
+		if (typeof ResizeObserver !== 'undefined') {
+			observer = new ResizeObserver(read);
+			observer.observe(el);
+		}
+		return () => observer?.disconnect();
+	});
+
 	function policyOf(file: MontageFile): string {
 		return file.timing?.policy ?? 'fit-audio';
 	}
@@ -726,7 +901,7 @@
 		if (policyOf(file) !== 'fixed-clip') {
 			return false;
 		}
-		if (file.audio || look === 'quick-slides') {
+		if (hasSoundtrack(file) || look === 'quick-slides') {
 			return true;
 		}
 		return look == null && (file.defaults?.hold ?? 0) === 0;
@@ -740,7 +915,7 @@
 	}
 
 	function timeEachEditable(file: MontageFile): boolean {
-		if (file.audio || uniformClip(file)) {
+		if (hasSoundtrack(file) || uniformClip(file)) {
 			return false;
 		}
 		const policy = policyOf(file);
@@ -789,6 +964,125 @@
 			return;
 		}
 		openPreview(index);
+	}
+
+	function onAudioClick(index: number) {
+		if (audioSwallow) {
+			audioSwallow = false;
+			return;
+		}
+		audioIndex = index;
+	}
+
+	function audioCenters(): number[] {
+		const rect = trackEl?.getBoundingClientRect();
+		if (!rect || rect.width <= 0) {
+			return [];
+		}
+		return audioPlaced.map((block) => rect.left + ((block.left + block.width / 2) / 100) * rect.width);
+	}
+
+	function startAudio(event: PointerEvent, index: number) {
+		if (event.button !== 0 || !doc) {
+			return;
+		}
+		event.stopPropagation();
+		audioSwallow = false;
+		const originX = event.clientX;
+		const originY = event.clientY;
+		let moved = false;
+		const move = (e: PointerEvent) => {
+			if (Math.hypot(e.clientX - originX, e.clientY - originY) < dragSlop) {
+				return;
+			}
+			moved = true;
+		};
+		const up = (e: PointerEvent) => {
+			window.removeEventListener('pointermove', move);
+			window.removeEventListener('pointerup', up);
+			if (!moved || !doc) {
+				return;
+			}
+			audioSwallow = true;
+			const to = dropIndex(audioCenters(), index, e.clientX);
+			if (to !== index) {
+				edit(reorderTrack(doc, index, to));
+				audioIndex = to;
+			}
+		};
+		window.addEventListener('pointermove', move);
+		window.addEventListener('pointerup', up);
+	}
+
+	function startGap(event: PointerEvent, index: number) {
+		if (event.button !== 0 || !doc || !trackEl) {
+			return;
+		}
+		event.stopPropagation();
+		const file = doc;
+		const originX = event.clientX;
+		const gap = file.tracks?.[index]?.gap ?? 0;
+		const width = trackEl.getBoundingClientRect().width;
+		const axis = Math.max(axisSeconds(), 0.001);
+		const move = (e: PointerEvent) => {
+			if (width <= 0) {
+				return;
+			}
+			gapPreviewIndex = index;
+			gapPreview = Math.max(0, gap + ((e.clientX - originX) / width) * axis);
+		};
+		const up = (e: PointerEvent) => {
+			window.removeEventListener('pointermove', move);
+			window.removeEventListener('pointerup', up);
+			window.removeEventListener('pointercancel', up);
+			const next = width > 0 ? Math.max(0, gap + ((e.clientX - originX) / width) * axis) : gap;
+			gapPreview = null;
+			gapPreviewIndex = null;
+			edit(setTrackGap(file, index, next));
+		};
+		window.addEventListener('pointermove', move);
+		window.addEventListener('pointerup', up);
+		window.addEventListener('pointercancel', up);
+	}
+
+	function jumpPicture() {
+		const query = pictureQuery.trim().toLowerCase();
+		if (!query || !doc?.slots) {
+			return;
+		}
+		const index = doc.slots.findIndex((slot) => slotLabel(slot).toLowerCase().includes(query));
+		if (index < 0) {
+			return;
+		}
+		choose(index);
+		document.getElementById(`picture-${index}`)?.scrollIntoView({ block: 'nearest' });
+		const block = placed.find((item) => item.slot === index);
+		if (block && scrollEl && contentWidth > viewportWidth) {
+			scrollEl.scrollLeft = Math.max(0, (block.left / 100) * contentWidth - viewportWidth / 2);
+		}
+	}
+
+	function startWindow(event: PointerEvent) {
+		const bar = event.currentTarget as HTMLElement;
+		const place = (e: PointerEvent) => {
+			if (!scrollEl || contentWidth <= viewportWidth) {
+				return;
+			}
+			const rect = bar.getBoundingClientRect();
+			const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+			scrollEl.scrollLeft = Math.min(
+				contentWidth - viewportWidth,
+				Math.max(0, ratio * contentWidth - viewportWidth / 2)
+			);
+		};
+		place(event);
+		const move = (e: PointerEvent) => place(e);
+		const up = () => {
+			window.removeEventListener('pointermove', move);
+			window.removeEventListener('pointerup', up);
+		};
+		window.addEventListener('pointermove', move);
+		window.addEventListener('pointerup', up);
 	}
 
 	function openPreview(index: number) {
@@ -988,6 +1282,9 @@
 					<p class="col-span-2 min-w-0 text-sm break-all">{filePath}</p>
 				{/if}
 			</div>
+			{#if error && errorSlot === 0}
+				<p role="alert" class="text-destructive text-sm whitespace-pre-line">{error}</p>
+			{/if}
 		</section>
 
 	{#if doc}
@@ -1008,17 +1305,43 @@
 										bind:value={songDraft}
 									/>
 								{/if}
-								<Button variant="outline" onclick={() => addSong()}>
-									{doc.audio ? 'Change soundtrack' : 'Add soundtrack'}
-								</Button>
+								<Button variant="outline" onclick={() => addSong()}>Add soundtrack</Button>
 							</div>
-							{#if doc.audio}
-								<div class="flex flex-wrap items-baseline justify-between gap-4">
-									<p class="min-w-0 text-sm break-all">{baseName(doc.audio)}</p>
-									<p class="w-40 text-sm whitespace-nowrap tabular-nums" data-aside>
-										{songSeconds != null ? songClock(songSeconds) : ''}
-									</p>
-								</div>
+							{#if doc.tracks?.length}
+								<ul class="flex flex-col gap-1">
+									{#each doc.tracks as track, index (`${track.src}:${index}`)}
+										<li>
+											<button
+												type="button"
+												class="flex w-full items-baseline justify-between gap-4 text-left text-sm {audioIndex === index ? 'font-medium' : ''}"
+												aria-pressed={audioIndex === index}
+												onclick={() => (audioIndex = index)}
+											>
+												<span class="min-w-0 break-all">{index + 1}. {baseName(track.src)}{track.gap ? ` · ${track.gap}s quiet` : ''}</span>
+											</button>
+										</li>
+									{/each}
+								</ul>
+								<p class="w-40 text-sm whitespace-nowrap tabular-nums" data-aside>
+									{songSeconds != null ? songClock(songSeconds) : ''}
+								</p>
+								{#if audioIndex != null && doc.tracks[audioIndex]}
+									<div class="flex flex-wrap items-end gap-2">
+										<label class="flex flex-col gap-1 text-sm">
+											Silence before
+											<input
+												class="border-input bg-background h-9 w-28 rounded-md border px-3"
+												aria-label="Silence before"
+												value={doc.tracks[audioIndex].gap ?? 0}
+												onchange={(event) => edit(setTrackGap(doc!, audioIndex!, Number(event.currentTarget.value)))}
+											/>
+										</label>
+										<Button variant="outline" onclick={() => { const next = moveTrack(doc!, audioIndex!, -1); edit(next); audioIndex = Math.max(0, audioIndex! - 1); }} disabled={audioIndex === 0}>Move soundtrack up</Button>
+										<Button variant="outline" onclick={() => { const next = moveTrack(doc!, audioIndex!, 1); edit(next); if (audioIndex! < (doc?.tracks?.length ?? 1) - 1) audioIndex = audioIndex! + 1; }} disabled={audioIndex === doc.tracks.length - 1}>Move soundtrack down</Button>
+										<Button variant="outline" onclick={() => replaceSong()}>Replace soundtrack</Button>
+										<Button variant="outline" onclick={() => { const next = removeTrack(doc!, audioIndex!, paceKeepingPictures(doc!)); const count = next.tracks?.length ?? 0; edit(next); audioIndex = count === 0 ? null : Math.min(audioIndex!, count - 1); }}>Remove soundtrack</Button>
+									</div>
+								{/if}
 							{/if}
 						</CardContent>
 					</Card>
@@ -1089,6 +1412,28 @@
 
 			<div class="flex flex-col gap-1" role="group" aria-labelledby="timeline-label">
 				<p id="timeline-label" class="text-sm font-medium">Timeline</p>
+				{#if contentWidth > viewportWidth + 1}
+					<div
+						class="relative mb-1 h-3 cursor-pointer"
+						role="slider"
+						tabindex="0"
+						aria-label="Film window"
+						aria-valuemin={0}
+						aria-valuemax={100}
+						aria-valuenow={Math.round((filmScroll / contentWidth) * 100)}
+						onpointerdown={startWindow}
+					>
+						{#each placed as block (`tick-${block.slot}`)}
+							<span class="bg-foreground/40 absolute top-0 h-1.5" style="left: {block.left}%; width: {block.width}%"></span>
+						{/each}
+						{#each audioPlaced as block (`sound-${block.index}`)}
+							<span class="bg-primary/70 absolute bottom-0 h-1.5" style="left: {block.left}%; width: {block.width}%"></span>
+						{/each}
+						<span class="bg-primary/20 absolute inset-y-0" style="left: {(filmScroll / contentWidth) * 100}%; width: {(viewportWidth / contentWidth) * 100}%"></span>
+					</div>
+				{/if}
+				<div bind:this={scrollEl} class="overflow-x-auto" onscroll={() => (filmScroll = scrollEl?.scrollLeft ?? 0)}>
+				<div style:width={contentWidth > viewportWidth + 1 ? `${contentWidth}px` : '100%'}>
 				<div class="relative">
 				<div
 					bind:this={trackEl}
@@ -1160,6 +1505,34 @@
 					</div>
 				{/if}
 				</div>
+				{#if audioPlaced.length}
+					<div class="relative mt-1 h-9" data-audio>
+						{#each audioPlaced as block (block.index)}
+							<button
+								type="button"
+								class="bg-primary/15 absolute inset-y-0 cursor-grab overflow-hidden rounded-sm px-1 text-left text-xs {audioIndex === block.index ? 'ring-primary z-10 ring-2 ring-inset' : ''}"
+								style="left: {block.left}%; width: {Math.max(block.width, 0.8)}%"
+								aria-label="Soundtrack {block.index + 1}. {block.src}"
+								aria-pressed={audioIndex === block.index}
+								onpointerdown={(event) => startAudio(event, block.index)}
+								onclick={() => onAudioClick(block.index)}
+							>{block.src}</button>
+						{/each}
+						{#each audioPlaced as block (`gap-${block.index}`)}
+							{#if block.index > 0}
+								<button
+									type="button"
+									class="absolute inset-y-0 z-20 w-3 -translate-x-1/2 cursor-ew-resize"
+									style="left: {block.left}%"
+									aria-label="Silence before {block.src}"
+									onpointerdown={(event) => startGap(event, block.index)}
+								></button>
+							{/if}
+						{/each}
+					</div>
+				{/if}
+				</div>
+				</div>
 				{#if plan}
 					<div class="text-muted-foreground flex justify-between text-xs tabular-nums">
 						<span>0:00</span>
@@ -1171,9 +1544,20 @@
 				<p>{describePlan(plan)}</p>
 			{/if}
 
-			<ul class="flex flex-col gap-2">
+			<label class="flex flex-col gap-1 text-sm">
+				Find a picture
+				<input
+					class="border-input bg-background h-9 rounded-md border px-3"
+					aria-label="Find a picture"
+					bind:value={pictureQuery}
+					onkeydown={(event) => {
+						if (event.key === 'Enter') jumpPicture();
+					}}
+				/>
+			</label>
+			<ul bind:this={listEl} class="flex max-h-96 flex-col gap-2 overflow-y-auto" onscroll={() => (listScroll = listEl?.scrollTop ?? 0)}>
 				{#each doc.slots ?? [] as slot, index (`${slot.src ?? 'card'}:${index}`)}
-					<li class="rounded-md border p-3 {selected === index ? 'border-primary' : ''}">
+					<li id="picture-{index}" class="rounded-md border {selected === index ? 'border-primary p-3' : 'px-3 py-1.5'}">
 						<button type="button" class="flex w-full min-w-0 items-center gap-2 text-left" onclick={() => choose(index)}>
 							{#if thumbForSlot(slot)}
 								<img alt="" src={thumbForSlot(slot)} class="h-10 w-16 shrink-0 rounded object-cover" />
@@ -1365,7 +1749,7 @@
 									<p class="text-muted-foreground text-sm">This look uses the same length for every picture.</p>
 								{:else if policyOf(doc) === 'fit-audio' && (doc.slots?.length ?? 0) < 2}
 									<p class="text-muted-foreground text-sm">
-										This picture runs for the whole {doc.audio ? 'song' : 'film'}.
+										This picture runs for the whole {hasSoundtrack(doc) ? 'song' : 'film'}.
 									</p>
 								{/if}
 								<div class="flex flex-wrap items-center gap-2">
@@ -1406,9 +1790,6 @@
 
 		<section class="flex flex-col gap-2">
 			<h2 class="font-medium">Render</h2>
-			{#if error}
-				<p role="alert" class="text-destructive text-sm whitespace-pre-line">{error}</p>
-			{/if}
 			<div class="flex flex-wrap items-center gap-2">
 				<Button variant="outline" onclick={exportScript} disabled={working || !plan}>
 					Export shell script
@@ -1426,9 +1807,6 @@
 		</section>
 	{/if}
 	</fieldset>
-	{#if error && !doc}
-		<p role="alert" class="text-destructive text-sm whitespace-pre-line">{error}</p>
-	{/if}
 	{#if previewIndex != null && doc?.slots?.[previewIndex]}
 		{@const preview = doc.slots[previewIndex]}
 		<dialog

@@ -25,10 +25,18 @@ export interface Card {
 	box?: boolean;
 }
 
+export interface PlanTrack {
+	src: string;
+	start: number;
+	dur: number;
+	gap?: number;
+}
+
 export interface Plan {
 	montage: number;
 	song?: number;
 	duration: number;
+	tracks?: PlanTrack[];
 	slots: {
 		src?: string;
 		card?: Card;
@@ -56,10 +64,16 @@ export interface Slot {
 	fixed?: boolean;
 }
 
+/** Track is one soundtrack file. gap is seconds of silence before it. */
+export interface Track {
+	src: string;
+	gap?: number;
+}
+
 /** MontageFile is the authored project. Derived clip lengths are not fields. */
 export interface MontageFile {
 	montage: 1;
-	audio?: string;
+	tracks?: Track[];
 	canvas?: { width?: number; height?: number; backdrop?: Backdrop };
 	output?: { width?: number; height?: number; file?: string };
 	defaults?: {

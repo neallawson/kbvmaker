@@ -27,7 +27,7 @@ function client(read?: MontageFile): { client: Client; plans: MontageFile[] } {
 			async planBody(body) {
 				plans.push({
 					montage: 1,
-					audio: body.audio,
+					tracks: body.tracks?.map((track) => ({ src: track.src, gap: track.gap })),
 					timing: body.timing,
 					slots: body.slots?.map((slot) => ({
 						src: slot.src,
@@ -53,7 +53,7 @@ function client(read?: MontageFile): { client: Client; plans: MontageFile[] } {
 				}
 				return {
 					montage: 1,
-					audio: read.audio,
+					tracks: read.tracks?.map((track) => ({ ...track })),
 					timing: read.timing,
 					defaults: read.defaults,
 					moves: read.moves,
@@ -156,7 +156,7 @@ describe('Editor', () => {
 		render(Editor, {
 			client: client({
 				montage: 1,
-				audio: 'song.mp3',
+				tracks: [{ src: 'song.mp3' }],
 				moves: ['in-center', 'in-right-left'],
 				slots: [{ src: 'a.jpg', mode: 'in-right-left' }]
 			}).client,
@@ -259,7 +259,7 @@ describe('Editor', () => {
 		await screen.findByRole('button', { name: 'Remove custom time' });
 		await waitFor(() => {
 			const last = api.plans.at(-1);
-			expect(last?.audio).toBeUndefined();
+			expect(last?.tracks).toBeUndefined();
 			expect(last?.timing).toEqual({ policy: 'fixed-clip', clip: 5 });
 			expect(last?.slots?.[0].dur).toBe(40);
 			expect(last?.slots?.[1].dur).toBeUndefined();
@@ -281,14 +281,14 @@ describe('Editor', () => {
 		await user.click(screen.getByRole('button', { name: 'Add soundtrack' }));
 		await waitFor(() => {
 			expect(api.plans.at(-1)?.timing).toEqual({ policy: 'fit-audio' });
-			expect(api.plans.at(-1)?.audio).toBe('/films/song.mp3');
+			expect(api.plans.at(-1)?.tracks).toEqual([{ src: '/films/song.mp3' }]);
 		});
 
 		await screen.findByText('0:20');
 		await user.click(screen.getByRole('tab', { name: 'No Soundtrack' }));
 		await waitFor(() => {
 			const last = api.plans.at(-1);
-			expect(last?.audio).toBeUndefined();
+			expect(last?.tracks).toBeUndefined();
 			expect(last?.timing).toEqual({ policy: 'fixed-clip', clip: 10 });
 		});
 		expect(screen.getByRole('tab', { name: 'No Soundtrack', selected: true })).toBeTruthy();
@@ -373,7 +373,7 @@ describe('Editor', () => {
 		const user = userEvent.setup();
 		const api = client({
 			montage: 1,
-			audio: 'song.mp3',
+			tracks: [{ src: 'song.mp3' }],
 			timing: { policy: 'fit-audio' },
 			slots: [
 				{ src: 'a.jpg', mode: 'in-center' },
@@ -416,7 +416,7 @@ describe('Editor', () => {
 		const user = userEvent.setup();
 		const api = client({
 			montage: 1,
-			audio: 'song.mp3',
+			tracks: [{ src: 'song.mp3' }],
 			timing: { policy: 'fit-audio' },
 			slots: [{ src: 'a.jpg', mode: 'in-center' }]
 		});
@@ -450,7 +450,7 @@ describe('Editor', () => {
 		const user = userEvent.setup();
 		const api = client({
 			montage: 1,
-			audio: 'song.mp3',
+			tracks: [{ src: 'song.mp3' }],
 			timing: { policy: 'fit-audio' },
 			slots: [{ src: 'a.jpg', mode: 'in-center' }]
 		});
@@ -495,7 +495,7 @@ describe('Editor', () => {
 		const user = userEvent.setup();
 		const api = client({
 			montage: 1,
-			audio: 'song.mp3',
+			tracks: [{ src: 'song.mp3' }],
 			timing: { policy: 'fit-audio' },
 			slots: [{ src: 'a.jpg', mode: 'in-center' }]
 		});
@@ -523,11 +523,49 @@ describe('Editor', () => {
 		expect(asked).toBe(false);
 	});
 
+	it('names the unknown field when an old montage will not open', async () => {
+		const user = userEvent.setup();
+		const api = client({
+			montage: 1,
+			timing: { policy: 'fixed-clip', clip: 5 },
+			slots: [{ src: 'a.jpg', mode: 'hold' }]
+		});
+		let opened = 0;
+		const openedFilm: MontageFile = {
+			montage: 1,
+			timing: { policy: 'fixed-clip', clip: 5 },
+			slots: [{ src: 'a.jpg', mode: 'hold' }]
+		};
+		api.client.read = async () => {
+			opened += 1;
+			if (opened === 1) {
+				return openedFilm;
+			}
+			throw new RuleError(0, 'unknown-field', 'Bad Montage File Format: contains unsupported "audio" field');
+		};
+		render(Editor, { client: api.client, host: browser });
+		const project = screen.getByRole('textbox', { name: 'Project file' });
+		await user.type(project, '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+		expect(await screen.findByRole('heading', { name: 'Pictures' })).toBeTruthy();
+
+		await user.clear(project);
+		await user.type(project, '/films/old.montage.json');
+		await user.click(screen.getByRole('button', { name: 'Open' }));
+
+		const alert = await screen.findByRole('alert');
+		expect(alert.textContent).toBe('Bad Montage File Format: contains unsupported "audio" field');
+		expect(screen.getByRole('heading', { level: 1 }).closest('section')?.contains(alert)).toBe(true);
+		expect(screen.getByText('Each picture shows up here as you add it.')).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Classic' }).getAttribute('aria-pressed')).toBe('true');
+		expect(screen.queryByText('a.jpg')).toBeNull();
+	});
+
 	it('reports every missing picture when a montage is opened', async () => {
 		const user = userEvent.setup();
 		const api = client({
 			montage: 1,
-			audio: 'song.mp3',
+			tracks: [{ src: 'song.mp3' }],
 			timing: { policy: 'fit-audio' },
 			slots: [
 				{ src: 'a.jpg', mode: 'in-center' },
@@ -548,7 +586,7 @@ describe('Editor', () => {
 		const alert = await screen.findByRole('alert');
 		expect(alert.textContent).toContain('Missing picture 2: b.jpg');
 		expect(alert.textContent).toContain('Missing picture 3: c.jpg');
-		expect(screen.getByRole('heading', { name: 'Render' }).parentElement?.contains(alert)).toBe(true);
+		expect(screen.getByRole('heading', { level: 1 }).closest('section')?.contains(alert)).toBe(true);
 		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).disabled).toBe(true);
 	});
 
@@ -556,7 +594,7 @@ describe('Editor', () => {
 		const user = userEvent.setup();
 		const api = client({
 			montage: 1,
-			audio: 'song.mp3',
+			tracks: [{ src: 'song.mp3' }],
 			timing: { policy: 'fit-audio' },
 			slots: [{ src: 'a.jpg', mode: 'in-center' }]
 		});
@@ -695,7 +733,7 @@ describe('Editor', () => {
 		const user = userEvent.setup();
 		const api = client({
 			montage: 1,
-			audio: 'song.mp3',
+			tracks: [{ src: 'song.mp3' }],
 			timing: { policy: 'fit-audio' },
 			defaults: { join: { type: 'fade', duration: 1 } },
 			slots: [
@@ -745,7 +783,7 @@ describe('Editor', () => {
 		render(Editor, {
 			client: client({
 				montage: 1,
-				audio: 'song.mp3',
+				tracks: [{ src: 'song.mp3' }],
 				timing: { policy: 'fit-audio' },
 				slots: [
 					{ src: 'a.jpg', mode: 'in-center', dur: 10 },
@@ -861,6 +899,36 @@ describe('Editor', () => {
 			card: { title: 'Opening' },
 			mode: 'hold'
 		});
+	});
+
+	it('appends soundtrack files, sets the silence before one, and shows it on the timeline', async () => {
+		const user = userEvent.setup();
+		const api = client();
+		render(Editor, { client: api.client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+		await user.type(screen.getByRole('textbox', { name: 'Song file' }), '/films/a.mp3');
+		await user.click(screen.getByRole('button', { name: 'Add soundtrack' }));
+		await user.type(screen.getByRole('textbox', { name: 'Song file' }), '/films/b.mp3');
+		await user.click(screen.getByRole('button', { name: 'Add soundtrack' }));
+		await waitFor(() => expect(api.plans.at(-1)?.tracks?.map((track) => track.src)).toEqual(['/films/a.mp3', '/films/b.mp3']));
+
+		await user.click(within(screen.getByRole('tabpanel')).getByRole('button', { name: /2\. b\.mp3/ }));
+		const silence = screen.getByRole('textbox', { name: 'Silence before' });
+		await user.clear(silence);
+		await user.type(silence, '4');
+		await user.tab();
+		await waitFor(() => expect(api.plans.at(-1)?.tracks?.[1]?.gap).toBe(4));
+		expect(screen.getByRole('button', { name: 'Soundtrack 2. b.mp3' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Silence before b.mp3' })).toBeTruthy();
+
+		await user.click(screen.getByRole('button', { name: 'Move soundtrack up' }));
+		await waitFor(() => expect(api.plans.at(-1)?.tracks?.map((track) => track.src)).toEqual(['/films/b.mp3', '/films/a.mp3']));
+		expect(api.plans.at(-1)?.tracks?.[0]?.gap).toBe(4);
 	});
 });
 

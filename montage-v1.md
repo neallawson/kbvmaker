@@ -78,7 +78,7 @@ Document {
   canvas?:   Canvas
   output?:   Output
   defaults?: Defaults
-  audio:     string
+  tracks?:   Track[]
   timing?:   Timing
   pool?:     Pool
   schedule?: Schedule
@@ -90,12 +90,18 @@ Document {
 
 `montage` must be the integer `1`.
 
-`audio` is the soundtrack. The song length is the container duration reported
-by ffprobe. The editor may omit `audio` while a project is still being
-assembled. `plan` and `render` also accept a document with no audio when the
+```
+Track { src: string, gap?: number }
+```
+
+`tracks` is the soundtrack, in play order. `src` is one audio file. `gap`
+is seconds of silence before that file, `>= 0`. Omitted `gap` means none.
+The song length is the sum of those silences and the container durations
+ffprobe reports. The editor may omit `tracks` while a project is still being
+assembled. `plan` and `render` also accept a document with no tracks when the
 timing policy has its own clock: `fit-audio` with `duration`, `fixed-clip`
 with authored slots, or `explicit` with authored slots. A pool, `markers`,
-and `fit-audio` without `duration` still need a song.
+and `fit-audio` without `duration` still need a soundtrack.
 
 The document has `slots`, or `pool`, or both only in the way Baking
 describes. The editor may omit both while a project is still being
@@ -439,15 +445,16 @@ The first slot has no fade in. The last has no fade out. A hold written from
 
 ### 7.1 fit-audio
 
-`N` is the number of slots. `D` is the song length. When `audio` is omitted,
+`N` is the number of slots. `D` is the soundtrack length: every file's
+duration plus the silence before it. When `tracks` is omitted,
 `D` is `timing.duration` instead:
 
 ```
 Timing { policy: "fit-audio", duration: number }
 ```
 
-`duration` is `> 0`. A document that sets both `audio` and `duration` is
-rejected: the song and the typed film length cannot both be the clock.
+`duration` is `> 0`. A document that sets both `tracks` and `duration` is
+rejected: the soundtrack and the typed film length cannot both be the clock.
 `x` is `JoinDur` when every join has that same duration. Version 1 of
 `fit-audio` requires every join to share one duration; per-slot join
 overrides belong to `markers` and `explicit`.
@@ -739,7 +746,7 @@ opts out of the reveal check: the picture may stay at `fill` and only pan.
    duration. Interpolate zoom and pan.
 9. Run Checks. Then compile the frame model.
 
-Invocation flags may override the audio path, the output path, the join
+Invocation flags may override the soundtrack with one file (`-audio`), the output path, the join
 duration, the hold, the zoom span, the blur, the random seed, and the
 schedule policy. The flag wins over the document. The blur flag sets the
 sigma of a `blur` backdrop, or of an `image` backdrop. It does not change a
@@ -773,6 +780,8 @@ Family `scan` skips the `reveal` check and still passes every other rule.
 The engine renders each slot's canvas through the motion filter for
 `clipDur` seconds, joins the clips with `xfade` of type `fade` at the
 resolved offsets, and muxes the soundtrack when the document has one.
+One track and no silence is that file. Two or more tracks, or any silence,
+are concatenated first into `work/soundtrack.wav` and that file is muxed.
 A document with no soundtrack writes the video stream only. A card's canvas
 is the painted PNG; the photograph blur path is not used, so the letters stay
 sharp.
@@ -782,7 +791,8 @@ a soundtrack is muxed. That output is trimmed to the shorter of the resolved
 video duration and the song (`-shortest` in ffmpeg terms). `+faststart` is
 set on the file.
 
-The plan, before any encode, reports the song duration when there is a song,
+The plan, before any encode, reports the song duration when there is a soundtrack,
+and each track's source, start, duration, and silence. It also reports
 each slot's source or card,
 mode or `basedOn`, family, clip start, clip duration, opaque range, `fill`,
 the far zoom, and each join's start and midpoint. That report is the
@@ -803,7 +813,7 @@ spec. `duration` and `hold` are seconds.
 ```json
 {
   "montage": 1,
-  "audio": "Love_Ruins-Greenhouse.mp3",
+  "tracks": [{"src": "Love_Ruins-Greenhouse.mp3"}],
   "slots": [
     { "src": "Greenhouse3.jpg", "mode": "out-center" },
     { "src": "Greenhouse8.jpg", "mode": "in-left-right" }
@@ -845,7 +855,7 @@ fade.
 ```json
 {
   "montage": 1,
-  "audio": "Love_Ruins-Greenhouse.mp3",
+  "tracks": [{"src": "Love_Ruins-Greenhouse.mp3"}],
   "timing": { "policy": "markers" },
   "slots": [
     {
@@ -868,7 +878,7 @@ A detached slot. The segments are the edit. `basedOn` is a note.
 ```json
 {
   "montage": 1,
-  "audio": "song.mp3",
+  "tracks": [{"src": "song.mp3"}],
   "slots": [
     {
       "src": "portrait.jpg",

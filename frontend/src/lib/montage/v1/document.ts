@@ -49,7 +49,7 @@ export function newProject(): MontageFile {
 
 export function applyLook(file: MontageFile, id: LookId): MontageFile {
 	const look = looks[id];
-	const pacedBySong = look.timing.policy === 'fit-audio' && !!file.audio;
+	const pacedBySong = look.timing.policy === 'fit-audio' && hasSoundtrack(file);
 	const slots = (file.slots ?? []).map((slot, index) => {
 		const next: Slot = {
 			...slot,
@@ -147,32 +147,97 @@ function movePool(file: MontageFile): readonly string[] {
 	return file.moves?.length ? file.moves : moves.map((move) => move.id);
 }
 
-/**
- * setAudio attaches a soundtrack.
- * Classic and Photo film, chosen in this session, hand the clock to the song.
- * Quick slides, and a file opened already on a picture clock, keep that clock.
- * A typed film length steps aside so the song and the film are not both the clock.
- */
-export function setAudio(file: MontageFile, audio: string, look?: LookId | null): MontageFile {
-	const policy = file.timing?.policy ?? 'fit-audio';
-	if (look === 'quick-slides' || (look == null && (policy === 'fixed-clip' || policy === 'explicit'))) {
-		if (file.timing?.duration == null) {
-			return { ...file, audio };
-		}
-		const timing = { ...file.timing };
-		delete timing.duration;
-		return { ...file, audio, timing };
-	}
-	return { ...file, audio, timing: { policy: 'fit-audio' } };
+/** hasSoundtrack is true once the file lists at least one track. */
+export function hasSoundtrack(file: MontageFile): boolean {
+	return (file.tracks?.length ?? 0) > 0;
 }
 
 /**
- * clearAudio drops the song.
+ * addTrack appends a soundtrack file.
+ * The first file on Classic or Photo film hands the clock to the soundtrack.
+ * Quick slides, and a file opened already on a picture clock, keep that clock.
+ * A typed film length steps aside so the soundtrack and the film are not both the clock.
+ * A later file keeps the clock that is already in use.
+ */
+export function addTrack(file: MontageFile, src: string, look?: LookId | null): MontageFile {
+	const tracks = [...(file.tracks ?? []), { src }];
+	if ((file.tracks?.length ?? 0) > 0) {
+		return { ...file, tracks };
+	}
+	const policy = file.timing?.policy ?? 'fit-audio';
+	if (look === 'quick-slides' || (look == null && (policy === 'fixed-clip' || policy === 'explicit'))) {
+		if (file.timing?.duration == null) {
+			return { ...file, tracks };
+		}
+		const timing = { ...file.timing };
+		delete timing.duration;
+		return { ...file, tracks, timing };
+	}
+	return { ...file, tracks, timing: { policy: 'fit-audio' } };
+}
+
+/** replaceTrack swaps the file at index and keeps its silence. */
+export function replaceTrack(file: MontageFile, index: number, src: string): MontageFile {
+	return {
+		...file,
+		tracks: (file.tracks ?? []).map((track, i) => (i === index ? { ...track, src } : track))
+	};
+}
+
+/** setTrackGap sets the silence before a track. Zero omits the field. */
+export function setTrackGap(file: MontageFile, index: number, gap: number): MontageFile {
+	return {
+		...file,
+		tracks: (file.tracks ?? []).map((track, i) => {
+			if (i !== index) {
+				return track;
+			}
+			const next = { ...track };
+			if (gap > 0) {
+				next.gap = roundSeconds(gap);
+			} else {
+				delete next.gap;
+			}
+			return next;
+		})
+	};
+}
+
+/** moveTrack reorders the soundtrack by one place. */
+export function moveTrack(file: MontageFile, index: number, delta: -1 | 1): MontageFile {
+	return reorderTrack(file, index, index + delta);
+}
+
+/** reorderTrack moves a soundtrack file to index `to`. */
+export function reorderTrack(file: MontageFile, index: number, to: number): MontageFile {
+	const tracks = [...(file.tracks ?? [])];
+	if (to < 0 || to >= tracks.length || to === index) {
+		return file;
+	}
+	const [track] = tracks.splice(index, 1);
+	tracks.splice(to, 0, track);
+	return { ...file, tracks };
+}
+
+/**
+ * removeTrack drops one file.
+ * The last file clears the soundtrack.
+ */
+export function removeTrack(file: MontageFile, index: number, sharedSeconds: number): MontageFile {
+	const tracks = (file.tracks ?? []).filter((_, i) => i !== index);
+	if (tracks.length === 0) {
+		return clearTracks(file, sharedSeconds);
+	}
+	return { ...file, tracks };
+}
+
+/**
+ * clearTracks drops the soundtrack.
  * A song-paced film keeps each picture's length: `sharedSeconds` is the pace
  * the pictures without their own time were using, and pins stay.
  */
-export function clearAudio(file: MontageFile, sharedSeconds: number): MontageFile {
-	const { audio: _audio, ...rest } = file;
+export function clearTracks(file: MontageFile, sharedSeconds: number): MontageFile {
+	const { tracks: _tracks, ...rest } = file;
 	if ((file.timing?.policy ?? 'fit-audio') !== 'fit-audio') {
 		return rest;
 	}
@@ -273,7 +338,7 @@ export function canPlan(file: MontageFile): boolean {
 	if (!file.slots?.length) {
 		return false;
 	}
-	if (file.audio) {
+	if (hasSoundtrack(file)) {
 		return true;
 	}
 	const policy = file.timing?.policy ?? 'fit-audio';
@@ -599,7 +664,7 @@ export function relativize(file: MontageFile, dir: string): MontageFile {
 	const rel = (path: string) => (path.startsWith(prefix) ? path.slice(prefix.length) : path);
 	return {
 		...file,
-		audio: file.audio ? rel(file.audio) : file.audio,
+		tracks: file.tracks?.map((track) => ({ ...track, src: rel(track.src) })),
 		output: file.output?.file ? { ...file.output, file: rel(file.output.file) } : file.output,
 		slots: file.slots?.map((slot) => (slot.card ? slot : { ...slot, src: rel(slot.src ?? '') }))
 	};

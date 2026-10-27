@@ -10,11 +10,20 @@ type Plan struct {
 	Song       float64 `json:"song"`
 	Duration   float64 `json:"duration"`
 	Dir        string  `json:"-"`
-	Audio      string  `json:"audio"`
+	Tracks     []Track `json:"tracks,omitempty"`
 	OutputFile string  `json:"outputFile"`
 	Canvas     Canvas  `json:"canvas"`
 	Output     Output  `json:"output"`
 	Slots      []Slot  `json:"slots"`
+}
+
+// Track is one soundtrack file placed on the film clock.
+// Start is when the file itself begins. Gap is the silence before it.
+type Track struct {
+	Src   string  `json:"src"`
+	Start float64 `json:"start"`
+	Dur   float64 `json:"dur"`
+	Gap   float64 `json:"gap,omitempty"`
 }
 
 // Canvas is the working still that zoompan reads.

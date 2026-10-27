@@ -151,7 +151,7 @@ func docFlags(fs *flag.FlagSet, o *opts) {
 	fs.StringVar(&o.dir, "dir", "", "project `DIR` for a document read from stdin (default: current directory)")
 	fs.StringVar(&o.ffmpeg, "ffmpeg", "ffmpeg", "ffmpeg `BINARY`")
 	fs.StringVar(&o.ffprobe, "ffprobe", "ffprobe", "ffprobe `BINARY`")
-	fs.StringVar(&o.audio, "audio", "", "use this song `FILE` instead of the document's")
+	fs.StringVar(&o.audio, "audio", "", "use this soundtrack `FILE` instead of tracks")
 	floatFlag(fs, "join", "dissolve length in `SECONDS`", &o.ov.Join)
 	floatFlag(fs, "hold", "still time at each end of a move, in `SECONDS`", &o.ov.Hold)
 	floatFlag(fs, "zoom-span", "how far a move zooms (`N`, above 0)", &o.ov.ZoomSpan)
