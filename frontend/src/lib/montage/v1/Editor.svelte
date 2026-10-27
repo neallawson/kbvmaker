@@ -435,11 +435,11 @@
 				void measureTracks(doc.tracks ?? []);
 			}
 		} catch (err) {
-			if (err instanceof RuleError && err.code === 'unknown-field') {
+			if (err instanceof RuleError && err.code !== 'missing-media') {
 				showError(err.message);
 				return;
 			}
-			const detail = err instanceof RuleError ? err.message : 'Could not open the project';
+			const detail = err instanceof RuleError ? err.message : 'the file could not be read';
 			showError(`Could not open ${chosen}: ${detail}`);
 		}
 	}

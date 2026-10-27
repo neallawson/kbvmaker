@@ -90,7 +90,7 @@ func TestResolveFitAudioWithoutAClock(t *testing.T) {
 	}
 	_, err = Resolve(context.Background(), d, &media.Fake{})
 	re, ok := rule.As(err)
-	if !ok || re.Code != "missing-field" || re.Msg != "tracks" {
+	if !ok || re.Code != "missing-field" || re.Msg != "this film needs a soundtrack" {
 		t.Fatalf("error %+v", err)
 	}
 }

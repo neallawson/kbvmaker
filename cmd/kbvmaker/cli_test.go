@@ -258,7 +258,7 @@ func TestOverrideBreakingARuleExits3(t *testing.T) {
 	p := newProject(t)
 	r := p.run(t, "plan", "--json", "piece.montage.json", "--zoom-span", "0")
 	expectCode(t, r, exitInvalid)
-	if f := jsonError(t, r); f.Code != "bad-number" || !strings.Contains(f.Message, "zoomSpan") {
+	if f := jsonError(t, r); f.Code != "bad-number" || !strings.Contains(f.Message, "zoom span") {
 		t.Fatalf("error %+v", f)
 	}
 }

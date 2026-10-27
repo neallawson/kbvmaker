@@ -52,7 +52,7 @@ func Clip(tp doc.TimePoint, p Place, slot int) (float64, error) {
 		case "opaque":
 			return onClock(tp, p.OpaqueStart, p.OpaqueEnd-p.OpaqueStart, slot)
 		default:
-			return 0, rule.E(slot, "bad-time", "clock %q", tp.Of)
+			return 0, rule.E(slot, "bad-time", "clock %q is not supported", tp.Of)
 		}
 	case "anchor":
 		var base float64
@@ -66,11 +66,11 @@ func Clip(tp doc.TimePoint, p Place, slot int) (float64, error) {
 		case "opaque-end":
 			base = p.OpaqueEnd
 		default:
-			return 0, rule.E(slot, "bad-time", "anchor %q", tp.Anchor)
+			return 0, rule.E(slot, "bad-time", "anchor %q is not supported", tp.Anchor)
 		}
 		return base + tp.Offset, nil
 	default:
-		return 0, rule.E(slot, "bad-time", "time kind %q", tp.Kind)
+		return 0, rule.E(slot, "bad-time", "time kind %q is not supported", tp.Kind)
 	}
 }
 
@@ -83,7 +83,7 @@ func songPoint(tp doc.TimePoint, song float64, fps, slot int) (float64, error) {
 	case "timecode":
 		m := timecode.FindStringSubmatch(tp.Timecode)
 		if m == nil {
-			return 0, rule.E(slot, "bad-time", "timecode %q", tp.Timecode)
+			return 0, rule.E(slot, "bad-time", "timecode %q is not a time", tp.Timecode)
 		}
 		h, _ := strconv.Atoi(m[1])
 		min, _ := strconv.Atoi(m[2])
@@ -95,7 +95,7 @@ func songPoint(tp doc.TimePoint, song float64, fps, slot int) (float64, error) {
 		return float64(h*3600+min*60+sec) + frac, nil
 	case "frame":
 		if fps <= 0 {
-			return 0, rule.E(slot, "bad-time", "fps is zero")
+			return 0, rule.E(slot, "bad-time", "frames per second must be greater than zero")
 		}
 		return float64(tp.Frame) / float64(fps), nil
 	case "anchor":
@@ -105,17 +105,17 @@ func songPoint(tp doc.TimePoint, song float64, fps, slot int) (float64, error) {
 		case "song-end":
 			return song + tp.Offset, nil
 		default:
-			return 0, rule.E(slot, "bad-time", "anchor %q", tp.Anchor)
+			return 0, rule.E(slot, "bad-time", "anchor %q is not supported", tp.Anchor)
 		}
 	default:
-		return 0, rule.E(slot, "bad-time", "time kind %q", tp.Kind)
+		return 0, rule.E(slot, "bad-time", "time kind %q is not supported", tp.Kind)
 	}
 }
 
 func onClock(tp doc.TimePoint, start, length float64, slot int) (float64, error) {
 	if tp.Kind == "pct" {
 		if tp.Pct < 0 || tp.Pct > 100 || math.IsNaN(tp.Pct) {
-			return 0, rule.E(slot, "bad-time", "percent %v", tp.Pct)
+			return 0, rule.E(slot, "bad-time", "percent %v must be from 0 to 100", tp.Pct)
 		}
 		return start + (tp.Pct/100)*length, nil
 	}

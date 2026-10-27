@@ -20,7 +20,7 @@ func Resolve(s doc.Slot, modes doc.ModeMap, place clock.Place, zoomSpan, holdDef
 		return "", "", "", nil, err
 	}
 	if builtin && traveling(s.Mode) && hold > place.OpaqueEnd-place.OpaqueStart+1e-9 {
-		return "", "", "", nil, rule.E(slot, "no-travel", "hold does not fit inside the opaque range")
+		return "", "", "", nil, rule.E(slot, "no-travel", "the still time is longer than the time this picture is fully on screen")
 	}
 	mode, basedOn = s.Mode, s.BasedOn
 	if len(s.Motion) > 0 {
@@ -174,7 +174,7 @@ func zoomRange(z doc.ZoomSpec, fill, limit float64, slot int) (float64, float64,
 
 func zoomEnd(e doc.ZoomEnd, fill, limit float64, slot int) (float64, error) {
 	if len(e.Atoms) == 0 {
-		return 0, rule.E(slot, "bad-number", "zoom endpoint is empty")
+		return 0, rule.E(slot, "bad-number", "a zoom endpoint needs a value")
 	}
 	m := math.Inf(1)
 	for _, a := range e.Atoms {
@@ -207,7 +207,7 @@ func zoomAtom(a doc.ZoomAtom, fill, limit float64, slot int) (float64, error) {
 	case "limit":
 		return limit, nil
 	default:
-		return 0, rule.E(slot, "bad-number", "zoom %q", a.Sym)
+		return 0, rule.E(slot, "bad-number", "zoom %q is not supported", a.Sym)
 	}
 }
 
@@ -231,7 +231,7 @@ func panEnd(e doc.PanEnd, slot int) (float64, float64, error) {
 	if uv, ok := panUV[e.Name]; ok {
 		return uv[0], uv[1], nil
 	}
-	return 0, 0, rule.E(slot, "bad-number", "pan %q", e.Name)
+	return 0, 0, rule.E(slot, "bad-number", "pan %q is not supported", e.Name)
 }
 
 func n(f float64) string {

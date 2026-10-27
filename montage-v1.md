@@ -755,7 +755,8 @@ sigma of a `blur` backdrop, or of an `image` backdrop. It does not change a
 ## 12. Checks
 
 The engine rejects the document and identifies the slot by its 1-based index
-and the rule.
+and the rule. A message names the field or value and what is wrong with it.
+A file that was read, but is not a montage, says `Bad Montage File Format`.
 
 | Rule | Condition |
 | --- | --- |

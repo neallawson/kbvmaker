@@ -120,7 +120,7 @@ func Generate(d *doc.Document, song float64) ([]doc.Slot, error) {
 		return nil, err
 	}
 	if len(files) == 0 {
-		return nil, rule.E(0, "pool", "pool is empty")
+		return nil, rule.E(0, "pool", "the picture pool is empty")
 	}
 	n, err := count(d, song, len(files))
 	if err != nil {
@@ -159,20 +159,20 @@ func count(d *doc.Document, song float64, poolSize int) (int, error) {
 			return fixedCount(song, d.Timing.Clip, d.Defaults.Join.Duration)
 		case "fit-audio":
 			if !d.Timing.HasCount || d.Timing.Count < 1 {
-				return 0, rule.E(0, "missing-field", "timing.count")
+				return 0, rule.E(0, "missing-field", "a loop on the soundtrack clock needs timing.count")
 			}
 			return d.Timing.Count, nil
 		default:
-			return 0, rule.E(0, "pool", "%s does not fill slots from a loop", d.Timing.Policy)
+			return 0, rule.E(0, "pool", "%s cannot take its pictures from a loop", d.Timing.Policy)
 		}
 	default:
-		return 0, rule.E(0, "unknown-field", "schedule policy %q", d.Schedule.Policy)
+		return 0, rule.E(0, "unknown-field", "schedule policy %q is not supported", d.Schedule.Policy)
 	}
 }
 
 func fixedCount(song, clip, join float64) (int, error) {
 	if clip <= join {
-		return 0, rule.E(0, "bad-number", "clip %v is not longer than the join %v", clip, join)
+		return 0, rule.E(0, "bad-number", "each picture is %v seconds, which is not longer than the %v second dissolve", clip, join)
 	}
 	n := int(math.Round((song - join) / (clip - join)))
 	if n < 1 {
@@ -212,7 +212,7 @@ func order(files []string, policy string, seed uint64, n int) ([]string, error) 
 		}
 		return out, nil
 	default:
-		return nil, rule.E(0, "unknown-field", "schedule policy %q", policy)
+		return nil, rule.E(0, "unknown-field", "schedule policy %q is not supported", policy)
 	}
 }
 
@@ -234,7 +234,7 @@ func poolFiles(d *doc.Document) ([]string, error) {
 	case "list":
 		return readList(d.Dir, doc.ResolvePath(d.Dir, d.Pool.List))
 	default:
-		return nil, rule.E(0, "pool", "empty pool")
+		return nil, rule.E(0, "pool", "the picture pool is empty")
 	}
 }
 

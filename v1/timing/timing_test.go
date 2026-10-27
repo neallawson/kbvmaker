@@ -173,7 +173,7 @@ func TestFitAudioFilmNamesTheFilm(t *testing.T) {
 		},
 	}
 	_, _, err := Resolve(d, d.Slots, d.Timing.Duration)
-	if err == nil || !strings.Contains(err.Error(), "sharing the film") {
+	if err == nil || !strings.Contains(err.Error(), "fill the rest of the film") {
 		t.Fatalf("error %v", err)
 	}
 	one := 3.0

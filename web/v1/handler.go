@@ -56,16 +56,16 @@ func (h Handler) audio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Path == "" {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "path"))
+		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "a soundtrack file is required"))
 		return
 	}
 	seconds, err := h.Probe.Duration(r.Context(), req.Path)
 	if err != nil {
-		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "audio %s", req.Path))
+		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "soundtrack file %s could not be read", req.Path))
 		return
 	}
 	if seconds <= 0 {
-		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "song duration %v", seconds))
+		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "the soundtrack length %v seconds cannot be used", seconds))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]float64{"seconds": seconds})
@@ -87,16 +87,20 @@ func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
 	}
 	hasPath := req.Path != ""
 	hasCard := req.Card != nil
-	if hasPath == hasCard {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "path or card"))
+	if hasPath && hasCard {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "a thumbnail takes a picture file or a card, not both"))
+		return
+	}
+	if !hasPath && !hasCard {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "missing-field", "a thumbnail needs a picture file or a card"))
 		return
 	}
 	if req.Width < 1 || req.Height < 1 || req.Width > media.ThumbMax || req.Height > media.ThumbMax {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "thumbnail size %dx%d", req.Width, req.Height))
+		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "thumbnail size %dx%d must be from 1 to %d pixels on each side", req.Width, req.Height, media.ThumbMax))
 		return
 	}
 	if req.Fit != "" && req.Fit != "cover" && req.Fit != "contain" {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "unknown-field", "fit %q", req.Fit))
+		writeRule(w, http.StatusBadRequest, rule.E(0, "unknown-field", "fit %q is not supported", req.Fit))
 		return
 	}
 	var jpeg []byte
@@ -108,7 +112,7 @@ func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
 		}
 		jpeg, err = card.JPEG(*req.Card, req.Width, req.Height)
 		if err != nil {
-			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "card thumbnail"))
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "the card could not be painted"))
 			return
 		}
 	} else {
@@ -123,7 +127,7 @@ func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
 		}
 		jpeg, err = makeThumb(r.Context(), req.Path, req.Width, req.Height)
 		if err != nil {
-			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "image %s", req.Path))
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "picture %s could not be read", req.Path))
 			return
 		}
 	}
@@ -151,7 +155,7 @@ func (h Handler) plan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(req.Body) > 0 && string(req.Body) != "null" && req.Document != "" {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "unknown-field", "document and body"))
+		writeRule(w, http.StatusBadRequest, rule.E(0, "unknown-field", "send a file path or a montage, not both"))
 		return
 	}
 	d, ok := h.loadPlan(w, req)
@@ -187,7 +191,7 @@ func (h Handler) document(w http.ResponseWriter, r *http.Request) {
 	b, err := os.ReadFile(req.Document)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "document %s", req.Document))
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "the file was not found"))
 			return
 		}
 		writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "bad-number", "%s", err.Error()))
@@ -214,7 +218,7 @@ func (h Handler) writeDocument(w http.ResponseWriter, req documentRequest) {
 	}
 	var buf bytes.Buffer
 	if err := json.Indent(&buf, req.Body, "", "  "); err != nil {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "request body"))
+		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "the request is not valid JSON"))
 		return
 	}
 	buf.WriteByte('\n')
@@ -288,7 +292,7 @@ func (h Handler) loadPlan(w http.ResponseWriter, req planRequest) (*doc.Document
 	d, err := engine.Load(req.Document)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "document %s", req.Document))
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "the file was not found"))
 			return nil, false
 		}
 		writeRule(w, http.StatusUnprocessableEntity, err)
@@ -305,7 +309,7 @@ func (h Handler) commands(w http.ResponseWriter, r *http.Request, path string) (
 	d, err := engine.Load(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "document %s", path))
+			writeRule(w, http.StatusUnprocessableEntity, rule.E(0, "missing-media", "the file was not found"))
 			return nil, "", false
 		}
 		writeRule(w, http.StatusUnprocessableEntity, err)
@@ -329,7 +333,7 @@ func decodeRequest(w http.ResponseWriter, r *http.Request, dest any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dest); err != nil {
-		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "request body"))
+		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "the request is not valid JSON"))
 		return false
 	}
 	return true

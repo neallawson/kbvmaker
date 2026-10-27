@@ -44,7 +44,7 @@ func Resolve(ctx context.Context, d *doc.Document, probe media.Probe) (*model.Pl
 			return nil, rule.E(0, "missing-media", "Cannot read soundtrack: %s", t.Src)
 		}
 		if dur <= 0 {
-			return nil, rule.E(0, "bad-number", "song duration %v", dur)
+			return nil, rule.E(0, "bad-number", "the soundtrack length %v seconds cannot be used", dur)
 		}
 		placed = append(placed, model.Track{Src: t.Src, Start: song + t.Gap, Dur: dur, Gap: t.Gap})
 		song += t.Gap + dur

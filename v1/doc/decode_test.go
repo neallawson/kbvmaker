@@ -81,7 +81,7 @@ func TestRejectsUnknownFieldAndWrongVersion(t *testing.T) {
 	}
 	_, err = Decode([]byte(`{"montage":2,"tracks": [{"src": "a.mp3"}]}`))
 	re, ok = rule.As(err)
-	if !ok || re.Code != "bad-number" {
+	if !ok || re.Code != "bad-number" || re.Msg != "Bad Montage File Format: version 2 is not supported" {
 		t.Fatalf("version: %v", err)
 	}
 }
@@ -184,7 +184,7 @@ func TestFitAudioRejectsAPinOnEveryPicture(t *testing.T) {
 	}
 	err = d.Validate()
 	re, ok := rule.As(err)
-	if !ok || re.Code != "bad-time" || re.Msg != "leave one picture sharing the song" {
+	if !ok || re.Code != "bad-time" || re.Msg != "one picture must be left without its own length, so it can fill the rest of the song" {
 		t.Fatalf("pins: %v", err)
 	}
 }
@@ -255,7 +255,7 @@ func TestSilentClocks(t *testing.T) {
 	}
 	err = filmPins.Validate()
 	re, ok = rule.As(err)
-	if !ok || re.Msg != "leave one picture sharing the film" {
+	if !ok || re.Msg != "one picture must be left without its own length, so it can fill the rest of the film" {
 		t.Fatalf("film pins: %v", err)
 	}
 	needsSong, err := Decode([]byte(`{
@@ -268,7 +268,7 @@ func TestSilentClocks(t *testing.T) {
 	}
 	err = needsSong.Validate()
 	re, ok = rule.As(err)
-	if !ok || re.Code != "missing-field" || re.Msg != "tracks" {
+	if !ok || re.Code != "missing-field" || re.Msg != "this film needs a soundtrack" {
 		t.Fatalf("needs song: %v", err)
 	}
 }

@@ -3,6 +3,7 @@ package doc
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -48,7 +49,7 @@ func trailing(dec *json.Decoder) error {
 	var extra any
 	if err := dec.Decode(&extra); err != io.EOF {
 		if err == nil {
-			return rule.E(0, "bad-number", "trailing JSON after the document")
+			return rule.E(0, "bad-number", "Bad Montage File Format: extra text follows the montage")
 		}
 		return wrapJSON(err)
 	}
@@ -66,9 +67,32 @@ func wrapJSON(err error) error {
 		return unsupportedField(name)
 	}
 	if strings.Contains(msg, "unknown field") {
-		return rule.E(0, "unknown-field", "%s", msg)
+		return rule.E(0, "unknown-field", "Bad Montage File Format: %s", strings.TrimPrefix(msg, "json: "))
 	}
-	return rule.E(0, "bad-number", "%s", msg)
+	return rule.E(0, "bad-number", "Bad Montage File Format: %s", jsonProblem(msg))
+}
+
+func jsonProblem(msg string) string {
+	msg = strings.TrimPrefix(msg, "json: ")
+	const mark = "field "
+	if strings.Contains(msg, "cannot unmarshal") && strings.Contains(msg, mark) {
+		rest := msg[strings.Index(msg, mark)+len(mark):]
+		if dot := strings.LastIndex(rest, "."); dot >= 0 {
+			rest = rest[dot+1:]
+		}
+		name := rest
+		if sp := strings.IndexByte(name, ' '); sp >= 0 {
+			name = name[:sp]
+		}
+		if name != "" {
+			return fmt.Sprintf("%q has the wrong kind of value", name)
+		}
+		return "a value has the wrong kind"
+	}
+	if msg == "" {
+		return "the file is not valid JSON"
+	}
+	return "the file is not valid JSON (" + msg + ")"
 }
 
 func unsupportedField(name string) error {
@@ -118,10 +142,10 @@ type rawDefaults struct {
 
 func (r rawDoc) document() (*Document, error) {
 	if r.Montage == nil {
-		return nil, rule.E(0, "missing-field", "montage")
+		return nil, rule.E(0, "missing-field", `Bad Montage File Format: the file needs "montage": 1`)
 	}
 	if *r.Montage != float64(version.Current) {
-		return nil, rule.E(0, "bad-number", "montage version %v", *r.Montage)
+		return nil, rule.E(0, "bad-number", "Bad Montage File Format: version %v is not supported", *r.Montage)
 	}
 	d := &Document{Montage: version.Current, Tracks: r.Tracks}
 	d.Canvas = Canvas{Width: 3840, Height: 2160, Backdrop: blurBackdrop(40)}
@@ -141,7 +165,7 @@ func (r rawDoc) document() (*Document, error) {
 			d.Canvas.Height = n
 		}
 		if c.Blur != nil && c.Backdrop != nil {
-			return nil, rule.E(0, "unknown-field", "canvas sets blur and backdrop")
+			return nil, rule.E(0, "unknown-field", "Bad Montage File Format: canvas sets both blur and backdrop")
 		}
 		if c.Backdrop != nil {
 			if err := c.Backdrop.finish(0); err != nil {
@@ -150,7 +174,7 @@ func (r rawDoc) document() (*Document, error) {
 			d.Canvas.Backdrop = *c.Backdrop
 		} else if c.Blur != nil {
 			if *c.Blur < 0 {
-				return nil, rule.E(0, "bad-number", "blur %v", *c.Blur)
+				return nil, rule.E(0, "bad-number", "blur %v must be zero or more", *c.Blur)
 			}
 			d.Canvas.Backdrop = blurBackdrop(*c.Blur)
 		}
@@ -265,14 +289,14 @@ func evenPx(v float64, name string) (int, error) {
 		return 0, err
 	}
 	if n%2 != 0 {
-		return 0, rule.E(0, "bad-number", "%s %d is odd", name, n)
+		return 0, rule.E(0, "bad-number", "%s %d must be an even number of pixels", name, n)
 	}
 	return n, nil
 }
 
 func positiveInt(v float64, name string) (int, error) {
 	if v <= 0 || v != float64(int(v)) || v > 1<<31-1 {
-		return 0, rule.E(0, "bad-number", "%s %v", name, v)
+		return 0, rule.E(0, "bad-number", "%s %v must be a positive whole number", name, v)
 	}
 	return int(v), nil
 }

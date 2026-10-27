@@ -40,7 +40,7 @@ func walkJSON(dec *json.Decoder) error {
 				return rule.E(0, "bad-number", "json object key is not a string")
 			}
 			if _, dup := seen[k]; dup {
-				return rule.E(0, "duplicate-key", "duplicate key %q", k)
+				return rule.E(0, "duplicate-key", "Bad Montage File Format: %q is repeated", k)
 			}
 			seen[k] = struct{}{}
 			if err := walkJSON(dec); err != nil {
@@ -101,7 +101,7 @@ func (t *TimePoint) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		if _, ok := raw["of"]; !ok {
-			return rule.E(0, "missing-field", "sec requires of")
+			return rule.E(0, "missing-field", "a time in seconds needs \"of\"")
 		}
 		t.Kind = "sec"
 		t.Sec, err = num(raw["sec"])
@@ -115,7 +115,7 @@ func (t *TimePoint) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		if _, ok := raw["of"]; !ok {
-			return rule.E(0, "missing-field", "pct requires of")
+			return rule.E(0, "missing-field", "a percent time needs \"of\"")
 		}
 		t.Kind = "pct"
 		t.Pct, err = num(raw["pct"])
@@ -123,7 +123,7 @@ func (t *TimePoint) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		if t.Pct < 0 || t.Pct > 100 {
-			return rule.E(0, "bad-time", "percent %v", t.Pct)
+			return rule.E(0, "bad-time", "percent %v must be from 0 to 100", t.Pct)
 		}
 		t.Of, err = str(raw["of"])
 		return err
@@ -144,7 +144,7 @@ func (t *TimePoint) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		if n < 0 || n != float64(int(n)) {
-			return rule.E(0, "bad-time", "frame %v", n)
+			return rule.E(0, "bad-time", "frame %v must be a whole number, zero or more", n)
 		}
 		t.Frame = int(n)
 		return nil
