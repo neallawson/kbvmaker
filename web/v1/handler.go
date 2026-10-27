@@ -8,6 +8,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"image"
+	_ "image/jpeg"
 	"net/http"
 	"os"
 
@@ -25,6 +27,8 @@ type Handler struct {
 	Probe media.Probe
 	// Thumb builds a JPEG of exactly width by height. Nil uses ffmpeg.
 	Thumb func(ctx context.Context, path string, width, height int) ([]byte, error)
+	// ThumbContain fits the whole picture inside the box. Nil uses ffmpeg.
+	ThumbContain func(ctx context.Context, path string, width, height int) ([]byte, error)
 }
 
 // Register mounts the Montage 1 routes on mux.
@@ -72,6 +76,8 @@ type thumbRequest struct {
 	Card   *doc.Card `json:"card"`
 	Width  int       `json:"width"`
 	Height int       `json:"height"`
+	// Fit is cover, the filmstrip crop, or contain, the whole picture.
+	Fit string `json:"fit,omitempty"`
 }
 
 func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +95,10 @@ func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
 		writeRule(w, http.StatusBadRequest, rule.E(0, "bad-number", "thumbnail size %dx%d", req.Width, req.Height))
 		return
 	}
+	if req.Fit != "" && req.Fit != "cover" && req.Fit != "contain" {
+		writeRule(w, http.StatusBadRequest, rule.E(0, "unknown-field", "fit %q", req.Fit))
+		return
+	}
 	var jpeg []byte
 	var err error
 	if hasCard {
@@ -103,7 +113,12 @@ func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		makeThumb := h.Thumb
-		if makeThumb == nil {
+		if req.Fit == "contain" {
+			makeThumb = h.ThumbContain
+			if makeThumb == nil {
+				makeThumb = media.ThumbnailContain
+			}
+		} else if makeThumb == nil {
 			makeThumb = media.Thumbnail
 		}
 		jpeg, err = makeThumb(r.Context(), req.Path, req.Width, req.Height)
@@ -112,10 +127,14 @@ func (h Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	width, height := req.Width, req.Height
+	if cfg, _, cfgErr := image.DecodeConfig(bytes.NewReader(jpeg)); cfgErr == nil {
+		width, height = cfg.Width, cfg.Height
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"type":   "image/jpeg",
-		"width":  req.Width,
-		"height": req.Height,
+		"width":  width,
+		"height": height,
 		"data":   base64.StdEncoding.EncodeToString(jpeg),
 	})
 }

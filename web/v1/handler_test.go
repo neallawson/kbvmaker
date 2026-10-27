@@ -155,6 +155,34 @@ func TestThumbnailReturnsTheRequestedJPEG(t *testing.T) {
 	}
 }
 
+func TestThumbnailContainFitsTheWholePicture(t *testing.T) {
+	mux := http.NewServeMux()
+	var gotPath string
+	var gotW, gotH int
+	webv1.Handler{
+		Probe: &media.Fake{},
+		Thumb: func(context.Context, string, int, int) ([]byte, error) {
+			t.Fatal("cover thumbnailer should not run")
+			return nil, nil
+		},
+		ThumbContain: func(_ context.Context, path string, w, h int) ([]byte, error) {
+			gotPath, gotW, gotH = path, w, h
+			return []byte("whole"), nil
+		},
+	}.Register(mux)
+	rec := post(mux, "/v1/thumbnail", `{"path":"/pics/a.jpg","width":512,"height":512,"fit":"contain"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	if gotPath != "/pics/a.jpg" || gotW != 512 || gotH != 512 {
+		t.Fatalf("contain %s %dx%d", gotPath, gotW, gotH)
+	}
+	rec = post(mux, "/v1/thumbnail", `{"path":"/pics/a.jpg","width":32,"height":18,"fit":"zoom"}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad fit %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestThumbnailRejectsABadSize(t *testing.T) {
 	mux := http.NewServeMux()
 	webv1.Handler{Probe: &media.Fake{}, Thumb: func(context.Context, string, int, int) ([]byte, error) {

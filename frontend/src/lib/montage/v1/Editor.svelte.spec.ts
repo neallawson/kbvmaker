@@ -63,8 +63,8 @@ function client(read?: MontageFile): { client: Client; plans: MontageFile[] } {
 			async save() {},
 			async exportScript() {},
 			async render() {},
-			async thumb() {
-				return 'data:image/jpeg;base64,thumb';
+			async thumb(_path: string, _width: number, _height: number, fit?: 'contain') {
+				return fit === 'contain' ? 'data:image/jpeg;base64,preview' : 'data:image/jpeg;base64,thumb';
 			},
 			async thumbCard() {
 				return 'data:image/jpeg;base64,cardthumb';
@@ -615,6 +615,7 @@ describe('Editor', () => {
 		await tick();
 
 		expect(pictureLabels(timeline)).toEqual(['1. b.jpg', '2. a.jpg']);
+		expect(screen.queryByRole('dialog')).toBeNull();
 		expect(screen.getByText('Unsaved changes')).toBeTruthy();
 		await waitFor(() => {
 			expect(api.plans.at(-1)?.slots?.map((slot) => slot.src)).toEqual(['/films/b.jpg', '/films/a.jpg']);
@@ -662,6 +663,32 @@ describe('Editor', () => {
 		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
 		await user.click(within(screen.getByRole('group', { name: 'Timeline' })).getByRole('button', { name: '2. b.jpg' }));
 		expect(screen.getByRole('button', { name: '2. b.jpg', pressed: true })).toBeTruthy();
+	});
+
+	it('opens the whole picture from a timeline click and closes it on click or Escape', async () => {
+		const user = userEvent.setup();
+		render(Editor, { client: client().client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		await user.type(screen.getByRole('textbox', { name: 'Picture file' }), '/films/a.jpg');
+		await user.click(screen.getByRole('button', { name: 'Add pictures' }));
+
+		const timeline = screen.getByRole('group', { name: 'Timeline' });
+		await user.click(within(timeline).getByRole('button', { name: '1. a.jpg' }));
+		const preview = await screen.findByRole('dialog', { name: 'Preview of a.jpg' });
+		expect(within(preview).getByRole('img', { name: 'a.jpg' }).getAttribute('src')).toBe(
+			'data:image/jpeg;base64,preview'
+		);
+		await user.click(preview);
+		expect(screen.queryByRole('dialog', { name: 'Preview of a.jpg' })).toBeNull();
+
+		await user.click(within(timeline).getByRole('button', { name: '1. a.jpg' }));
+		expect(await screen.findByRole('dialog', { name: 'Preview of a.jpg' })).toBeTruthy();
+		await user.keyboard('{Escape}');
+		expect(screen.queryByRole('dialog', { name: 'Preview of a.jpg' })).toBeNull();
+
+		await user.click(within(screen.getByRole('list')).getByRole('button', { name: /1\. a\.jpg/ }));
+		expect(screen.queryByRole('dialog')).toBeNull();
 	});
 
 	it('drags a dissolve grip to give time to one picture and take it from the next', async () => {

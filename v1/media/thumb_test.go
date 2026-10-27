@@ -41,6 +41,26 @@ func TestThumbnailCoversTheRequestedBox(t *testing.T) {
 	}
 }
 
+func TestThumbnailContainKeepsTheWholePicture(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg is not installed")
+	}
+	path := filepath.Join(t.TempDir(), "wide.png")
+	writePNG(t, path, 200, 40, color.NRGBA{R: 20, G: 80, B: 180, A: 255})
+
+	jpegBytes, err := ThumbnailContain(context.Background(), path, 32, 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := jpeg.Decode(bytes.NewReader(jpegBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Bounds().Dx() != 32 || got.Bounds().Dy() >= 32 || got.Bounds().Dy() < 1 {
+		t.Fatalf("contained thumbnail is %dx%d, want the full 5:1 frame inside 32x32", got.Bounds().Dx(), got.Bounds().Dy())
+	}
+}
+
 func TestThumbnailMissingFile(t *testing.T) {
 	_, err := Thumbnail(context.Background(), filepath.Join(t.TempDir(), "gone.jpg"), 16, 16)
 	if err == nil {

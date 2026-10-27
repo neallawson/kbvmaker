@@ -28,11 +28,23 @@ var thumbs = struct {
 // The picture is scaled to cover that box and center-cropped.
 // A repeated request for an unchanged file is served from memory.
 func Thumbnail(ctx context.Context, path string, width, height int) ([]byte, error) {
+	vf := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d", width, height, width, height)
+	return thumbnail(ctx, path, width, height, "cover", vf)
+}
+
+// ThumbnailContain scales the whole picture to fit inside width by height.
+// The JPEG keeps the picture's shape, so neither edge is cropped.
+func ThumbnailContain(ctx context.Context, path string, width, height int) ([]byte, error) {
+	vf := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease", width, height)
+	return thumbnail(ctx, path, width, height, "contain", vf)
+}
+
+func thumbnail(ctx context.Context, path string, width, height int, fit, vf string) ([]byte, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
-	key := fmt.Sprintf("%s\x00%d\x00%d\x00%d", path, info.ModTime().UnixNano(), width, height)
+	key := fmt.Sprintf("%s\x00%d\x00%d\x00%d\x00%s", path, info.ModTime().UnixNano(), width, height, fit)
 	if jpeg, ok := thumbGet(key); ok {
 		return jpeg, nil
 	}
@@ -40,7 +52,6 @@ func Thumbnail(ctx context.Context, path string, width, height int) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	vf := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d", width, height, width, height)
 	jpeg, err := run(ctx, ff,
 		"-hide_banner", "-loglevel", "error",
 		"-i", path,

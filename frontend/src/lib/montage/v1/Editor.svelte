@@ -90,6 +90,10 @@
 	/** scan bumps when the soundtrack and pictures should be read from disk again. */
 	let scan = $state(0);
 	let thumbGen = $state(0);
+	let previewIndex = $state<number | null>(null);
+	let previewURL = $state('');
+	let previewEl = $state<HTMLDialogElement | null>(null);
+	const previewEdge = 512;
 
 	const title = 'kbvmaker - Montage (v1) editor, renderer';
 	const thumbWidth = 320;
@@ -237,6 +241,49 @@
 		const onFocus = () => checkFiles();
 		window.addEventListener('focus', onFocus);
 		return () => window.removeEventListener('focus', onFocus);
+	});
+
+	$effect(() => {
+		const index = previewIndex;
+		const slot = index == null ? undefined : doc?.slots?.[index];
+		if (!slot) {
+			previewURL = '';
+			return;
+		}
+		let live = true;
+		const dir = projectDir(filePath);
+		const request = slot.card
+			? client.thumbCard(slot.card, previewEdge, Math.round((previewEdge * 9) / 16))
+			: client.thumb(mediaPath(dir, slot.src ?? ''), previewEdge, previewEdge, 'contain');
+		void request
+			.then((url) => {
+				if (live) previewURL = url;
+			})
+			.catch(() => {
+				if (live) previewURL = '';
+			});
+		return () => {
+			live = false;
+		};
+	});
+
+	$effect(() => {
+		const el = previewEl;
+		if (previewIndex == null || !el || el.open) return;
+		try {
+			el.showModal();
+		} catch {
+			el.open = true;
+		}
+	});
+
+	$effect(() => {
+		if (previewIndex == null) return;
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') closePreview();
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
 	});
 
 	$effect(() => {
@@ -741,7 +788,18 @@
 			swallowClick = false;
 			return;
 		}
+		openPreview(index);
+	}
+
+	function openPreview(index: number) {
 		choose(index);
+		previewIndex = index;
+	}
+
+	function closePreview() {
+		previewEl?.close();
+		previewIndex = null;
+		previewURL = '';
 	}
 
 	function pictureCenters(): number[] {
@@ -1370,6 +1428,24 @@
 	</fieldset>
 	{#if error && !doc}
 		<p role="alert" class="text-destructive text-sm whitespace-pre-line">{error}</p>
+	{/if}
+	{#if previewIndex != null && doc?.slots?.[previewIndex]}
+		{@const preview = doc.slots[previewIndex]}
+		<dialog
+			bind:this={previewEl}
+			aria-modal="true"
+			aria-label="Preview of {slotLabel(preview)}"
+			class="fixed inset-0 z-50 m-0 flex h-full max-h-none w-full max-w-none cursor-zoom-out items-center justify-center border-0 bg-black/80 p-6"
+			onclick={closePreview}
+			oncancel={(event) => {
+				event.preventDefault();
+				closePreview();
+			}}
+		>
+			{#if previewURL}
+				<img alt={slotLabel(preview)} class="max-h-[90vh] max-w-[90vw] object-contain" src={previewURL} />
+			{/if}
+		</dialog>
 	{/if}
 </main>
 

@@ -1163,7 +1163,9 @@ that writes the Montage to disk.
 Drag a picture along the timeline and drop it. That writes the same slot
 list as Move up and Move down. The picture keeps its file, its move, and
 its pin, and it stays selected. A press that does not travel still selects
-that row. The picture can be dropped anywhere on the timeline. Each
+that row and opens a larger view of the whole picture. Click the view, or
+press Escape, to close it. A drag does not open the view. The list does not
+open it either. The picture can be dropped anywhere on the timeline. Each
 picture's center splits the timeline into the places it can land. A drop
 between two centers sits between those two pictures: the one on the left
 and the one on the right. A drop on a center counts as the left side of

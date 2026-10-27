@@ -83,8 +83,8 @@ export interface Client {
 	save(path: string, body: MontageFile): Promise<void>;
 	exportScript(path: string, file: string): Promise<void>;
 	render(path: string): Promise<void>;
-	/** thumb is a data URL for a JPEG of exactly width by height. */
-	thumb(path: string, width: number, height: number): Promise<string>;
+	/** thumb is a data URL for a JPEG. contain fits the whole picture inside the box. */
+	thumb(path: string, width: number, height: number, fit?: 'contain'): Promise<string>;
 	/** thumbCard paints a title or credits card to that same JPEG size. */
 	thumbCard(card: Card, width: number, height: number): Promise<string>;
 }
@@ -115,11 +115,11 @@ export function createClient(fetchImpl: typeof fetch = fetch, base = ''): Client
 		async render(path) {
 			await readJSON(fetchImpl, `${base}/v1/render`, jsonBody({ document: path }));
 		},
-		async thumb(path, width, height) {
+		async thumb(path, width, height, fit) {
 			const body = await readJSON<{ type: string; data: string }>(
 				fetchImpl,
 				`${base}/v1/thumbnail`,
-				jsonBody({ path, width, height })
+				jsonBody({ path, width, height, ...(fit ? { fit } : {}) })
 			);
 			return `data:${body.type};base64,${body.data}`;
 		},

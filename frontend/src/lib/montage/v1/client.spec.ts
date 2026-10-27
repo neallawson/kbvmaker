@@ -40,6 +40,8 @@ describe('Montage 1 client', () => {
 		});
 		await expect(client.thumb('/pics/a.jpg', 32, 18)).resolves.toBe('data:image/jpeg;base64,abc');
 		expect(JSON.parse(sent)).toEqual({ path: '/pics/a.jpg', width: 32, height: 18 });
+		await expect(client.thumb('/pics/a.jpg', 512, 512, 'contain')).resolves.toBe('data:image/jpeg;base64,abc');
+		expect(JSON.parse(sent)).toEqual({ path: '/pics/a.jpg', width: 512, height: 512, fit: 'contain' });
 	});
 
 	it('asks for a painted card thumbnail', async () => {
