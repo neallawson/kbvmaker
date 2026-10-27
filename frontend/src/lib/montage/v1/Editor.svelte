@@ -239,6 +239,23 @@
 		return () => window.removeEventListener('focus', onFocus);
 	});
 
+	$effect(() => {
+		const unsaved = dirty && !!doc;
+		host.setUnsaved?.(unsaved);
+		if (host.name !== 'browser') {
+			return;
+		}
+		const onClose = (event: BeforeUnloadEvent) => {
+			if (!unsaved) {
+				return;
+			}
+			event.preventDefault();
+			event.returnValue = '';
+		};
+		window.addEventListener('beforeunload', onClose);
+		return () => window.removeEventListener('beforeunload', onClose);
+	});
+
 	function showError(message: string, slot = 0, kind: 'plan' | 'action' = 'action') {
 		error = message;
 		errorSlot = slot;
@@ -903,7 +920,7 @@
 					<div class="flex flex-wrap gap-2">
 						<Button onclick={newProjectFile} disabled={working}>New</Button>
 						<Button variant="outline" onclick={() => openProject()} disabled={working}>Open</Button>
-						<Button variant="outline" onclick={save} disabled={working || !doc}>Save</Button>
+						<Button variant={dirty && doc ? 'default' : 'outline'} onclick={save} disabled={working || !doc || !dirty}>Save</Button>
 					</div>
 				</div>
 				<p class="text-muted-foreground w-40 text-sm whitespace-nowrap" data-aside>

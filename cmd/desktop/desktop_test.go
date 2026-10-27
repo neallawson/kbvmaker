@@ -25,6 +25,35 @@ const editorDocument = `{
   "audio": "/music/song.mp3"
 }`
 
+func TestCloseAsksOnlyWhenTheFilmIsUnsaved(t *testing.T) {
+	d := &Dialogs{}
+	if d.stayOpen(func() (string, error) {
+		t.Fatal("a saved film asked before closing")
+		return "", nil
+	}) {
+		t.Fatal("a saved film stayed open")
+	}
+	d.SetUnsaved(true)
+	if !d.stayOpen(func() (string, error) { return "No", nil }) {
+		t.Fatal("No closed the window")
+	}
+	if !d.stayOpen(func() (string, error) { return "", nil }) {
+		t.Fatal("a dismissed dialog closed the window")
+	}
+	if !d.stayOpen(func() (string, error) { return "Yes", errClose }) {
+		t.Fatal("a failed dialog closed the window")
+	}
+	if d.stayOpen(func() (string, error) { return "Yes", nil }) {
+		t.Fatal("Yes kept the window open")
+	}
+}
+
+type closeError struct{}
+
+func (closeError) Error() string { return "dialog" }
+
+var errClose error = closeError{}
+
 func TestAPISavesTheEditorDocument(t *testing.T) {
 	api := &API{handler: web.Server{Probe: &media.Fake{}}.Handler()}
 	path := filepath.Join(t.TempDir(), "piece.montage.json")

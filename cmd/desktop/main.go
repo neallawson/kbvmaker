@@ -51,8 +51,9 @@ func run(args []string) error {
 			Assets:  client,
 			Handler: handler,
 		},
-		OnStartup: dialogs.startup,
-		Bind:      []interface{}{dialogs, &API{handler: handler}},
+		OnStartup:     dialogs.startup,
+		OnBeforeClose: dialogs.beforeClose,
+		Bind:          []interface{}{dialogs, &API{handler: handler}},
 	})
 }
 

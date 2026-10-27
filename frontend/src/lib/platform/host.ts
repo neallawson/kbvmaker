@@ -10,6 +10,8 @@ export interface Host {
 	pickAudio?: () => Promise<string>;
 	pickSaveScript?: () => Promise<string>;
 	pickSaveVideo?: () => Promise<string>;
+	/** setUnsaved tells the window that closing should ask before discarding the film. */
+	setUnsaved?: (unsaved: boolean) => void;
 }
 
 interface WailsDialogs {
@@ -19,6 +21,7 @@ interface WailsDialogs {
 	OpenAudio(): Promise<string>;
 	SaveScript(): Promise<string>;
 	SaveVideo(): Promise<string>;
+	SetUnsaved?(unsaved: boolean): Promise<void>;
 }
 
 interface WailsAPI {
@@ -45,7 +48,8 @@ export function currentHost(): Host {
 		pickImages: () => dialogs.OpenImages(),
 		pickAudio: () => dialogs.OpenAudio(),
 		pickSaveScript: () => dialogs.SaveScript(),
-		pickSaveVideo: () => dialogs.SaveVideo()
+		pickSaveVideo: () => dialogs.SaveVideo(),
+		setUnsaved: dialogs.SetUnsaved ? (unsaved) => void dialogs.SetUnsaved?.(unsaved) : undefined
 	};
 }
 

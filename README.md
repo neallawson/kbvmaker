@@ -74,7 +74,7 @@ ffmpeg runs on the machine that serves the page.
 
 ### Making a film
 
-**New** starts a Classic project in memory. **Save** asks where to write it, and the dialog suggests `piece.montage.json`. **Open** reads a Montage that already exists. The line beside the buttons shows "Unsaved changes" until Save, then "Saved". The path sits under the buttons. Save writes the file with no song and no pictures yet. Picture and song paths are stored relative to the project file, so the folder can move with its media.
+**New** starts a Classic project in memory. **Save** asks where to write it, and the dialog suggests `piece.montage.json`. **Save** is filled in while the film has unsaved changes, and it is quiet and cannot be clicked once those changes are written. **Open** reads a Montage that already exists. The line beside the buttons shows "Unsaved changes" until Save, then "Saved". Closing the window, or the browser tab, asks before those changes are discarded. The path sits under the buttons. Save writes the file with no song and no pictures yet. Picture and song paths are stored relative to the project file, so the folder can move with its media.
 
 The clock is two tabs. **Soundtrack** is open on a new project. It picks the audio (`mp3`, `wav`, `m4a`, `flac`, or `aac`). The file name and its length appear beside **Add soundtrack**. **Change soundtrack** replaces the file. Choosing a song does not change the clock until that file is picked. Classic or Photo film then makes the song the length. Quick slides stays at 5 seconds each, and the song ends with whichever is shorter. An opened file that is already on a picture clock keeps that clock.
 

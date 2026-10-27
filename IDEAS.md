@@ -1146,7 +1146,7 @@ from disk and loads the thumbnails again. The same check runs when the
 window comes back to the front, so a file put back at its old path, or a
 new picture saved over the same name, shows up without a change to the
 Montage. Render shows the ffmpeg log when a command fails.
-Unsaved edits are visible. An engine error names the picture it belongs to.
+Unsaved edits are visible. **Save** is filled in while they are unsaved and cannot be clicked once they are written. Closing the window asks before discarding them. An engine error names the picture it belongs to.
 
 Enter and exit stills, a per-picture fill, and a live ffmpeg stream are not
 part of this screen yet. The length box and the move name are the picture

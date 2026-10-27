@@ -3,17 +3,46 @@ package main
 import (
 	"context"
 	"path/filepath"
+	"sync/atomic"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // Dialogs opens the native file dialogs.
 // Each dialog remembers the folder of the last file it returned.
 type Dialogs struct {
 	ctx        context.Context
+	unsaved    atomic.Bool
 	montageDir string
 	imageDir   string
 	audioDir   string
 	scriptDir  string
 	videoDir   string
+}
+
+// SetUnsaved records whether the open film has changes that are not on disk.
+func (d *Dialogs) SetUnsaved(unsaved bool) {
+	d.unsaved.Store(unsaved)
+}
+
+// beforeClose keeps the window open while the film is unsaved, unless the person confirms.
+func (d *Dialogs) beforeClose(ctx context.Context) bool {
+	return d.stayOpen(func() (string, error) {
+		return runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
+			Type:    runtime.QuestionDialog,
+			Title:   "kbvmaker",
+			Message: "This film has unsaved changes. Close without saving?",
+		})
+	})
+}
+
+// stayOpen is true when the window should remain. Yes is the only answer that closes a dirty film.
+func (d *Dialogs) stayOpen(confirm func() (string, error)) bool {
+	if !d.unsaved.Load() {
+		return false
+	}
+	answer, err := confirm()
+	return err != nil || answer != "Yes"
 }
 
 func (d *Dialogs) remember(path string, dir *string) {

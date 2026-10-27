@@ -306,6 +306,48 @@ describe('Editor', () => {
 		);
 	});
 
+	it('fills Save only while the film is unsaved and asks before a close', async () => {
+		const user = userEvent.setup();
+		const marks: boolean[] = [];
+		const host: Host = {
+			name: 'window',
+			setUnsaved: (unsaved) => {
+				marks.push(unsaved);
+			},
+			pickSaveMontage: async () => '/films/piece.montage.json'
+		};
+		render(Editor, { client: client().client, host });
+
+		const save = () => screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+		expect(save().disabled).toBe(true);
+		expect(save().className).toContain('border');
+		expect(save().className).not.toContain('bg-primary');
+
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		expect(save().disabled).toBe(false);
+		expect(save().className).toContain('bg-primary');
+		expect(marks.at(-1)).toBe(true);
+
+		await user.click(save());
+		expect(await screen.findByText('Saved')).toBeTruthy();
+		expect(save().disabled).toBe(true);
+		expect(save().className).not.toContain('bg-primary');
+		expect(marks.at(-1)).toBe(false);
+
+		cleanup();
+		render(Editor, { client: client().client, host: browser });
+		await user.type(screen.getByRole('textbox', { name: 'Project file' }), '/films/piece.montage.json');
+		await user.click(screen.getByRole('button', { name: 'New' }));
+		const leave = new Event('beforeunload', { cancelable: true });
+		window.dispatchEvent(leave);
+		expect(leave.defaultPrevented).toBe(true);
+
+		await user.click(screen.getByRole('button', { name: 'Save' }));
+		const stay = new Event('beforeunload', { cancelable: true });
+		window.dispatchEvent(stay);
+		expect(stay.defaultPrevented).toBe(false);
+	});
+
 	it('does not ask for a file until Save', async () => {
 		const user = userEvent.setup();
 		let asked = false;
