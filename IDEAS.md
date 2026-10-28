@@ -1324,6 +1324,57 @@ the enter/exit stills are custom components in the v1 editor.
 `/v1` returns the rule error as `{ "slot", "code", "message" }`. Tests cover
 the handlers without a window, and the v1 client and screens without Wails.
 
+## Mobile Discussions
+
+I would keep the Montage file and the Go engine, and rebuild the phone around a
+project folder and a different editor. The current window is a wide,
+mouse-driven screen sitting on ffmpeg, and that combination does not survive a
+shrink to an iPhone.
+
+The engine already has the right seam. `v1` resolves the film, and the Svelte
+client only talks to it through `/v1`. On the desktop that call is already
+in-process (`API.Call`) because the window cannot rely on a normal HTTP POST.
+An iPhone build would do the same thing: compile those Go packages into a
+static library and call plan, validate, and save from Swift. The timing rules,
+looks, cards, and the `tracks` list would not be rewritten. A second copy of
+Montage in Swift is how the phone and the desktop would drift apart.
+
+The project folder is the other piece that travels. Pictures and soundtrack
+files are already paths relative to the Montage, and the folder is meant to
+move with its media. On a phone that folder lives in the app sandbox or in
+iCloud Drive. **Add pictures** copies from the photo library into that folder.
+**Add soundtrack** copies from Files. The document never stores a photo-library
+identifier. Open and Save go through the document picker, and the
+unsaved-changes question stays the same one the window already asks.
+
+Rendering is the break. The desktop writes an ffmpeg command and runs it. iOS
+has no shell and no ffmpeg on the path, and a 1920×1080 zoom-and-dissolve
+render will also thermal-throttle a phone. I would not start by linking libav
+into the app. The first phone build would edit and save the Montage, show the
+plan, and leave **Render video** to the Mac or the command line, which already
+read that file. A phone that must produce the video itself wants a second
+backend behind the same plan: AVFoundation compositions for the clips,
+dissolves, and the soundtrack concat. That is a new renderer, not a port of
+the argv builder. Card painting can stay in Go. Photo thumbnails would switch
+from the ffmpeg thumbnail call to ImageIO, since the phone would no longer
+have ffprobe.
+
+The screen would be redesigned, not reflowed. One column cannot hold the
+project, the soundtrack, the look, the picture list, and both timeline lanes.
+The picture list is already the reliable editor: select, length, move, pin,
+replace. That becomes the main surface. The film strip becomes a horizontal
+scroll of fixed-size thumbnails with a time ruler, because proportional blocks
+fall under a usable touch size as soon as the film is long. The dissolve grip
+and the silence grip are mouse tools. On a phone those edits stay in the
+fields that already exist, **Length in seconds** and **Silence before**.
+Drag-to-reorder can remain on the rows. The full-picture preview is already a
+tap, so that stays.
+
+So the sequence would be: Go library in an iOS shell, project folder plus
+photo and file import, a list-first editor that reads and writes the same
+Montage, and render left on the machines that have ffmpeg. A later
+AVFoundation renderer is what would make **Render video** honest on the phone.
+
 ## Appendix
 
 ### Research into zoom anti-aliasing
