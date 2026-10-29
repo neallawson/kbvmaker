@@ -45,6 +45,8 @@ Zoom `1.0` means the whole photograph is in frame. Apply rotation metadata befor
 
 `./scripts/build` builds the client and embeds it in the GUI in the same run. The window does not read `frontend/build` when it starts. On Linux the script selects WebKitGTK 4.1 or 4.0 with pkg-config. Windows PowerShell uses `scripts/build.ps1`. Leave those commands out of the README. The script prints the package to install when the library is missing. `kbvmaker serve -static` is the browser host and is a separate program.
 
+A tag `v*.*.*` on GitHub runs `.github/workflows/windows.yml` on `windows-latest`. That job builds `kbvmaker.exe` and `kbvmaker-gui.exe` and attaches `kbvmaker-windows-amd64.zip` to the release. The GUI is not cross-compiled from Linux. ffmpeg stays a program on the user's PATH. The workflow calls `build.ps1 -SkipFFmpegCheck` because the compile does not run ffmpeg.
+
 ## Tests
 
 `go test ./...` is the Go check. Add a test at the seam you changed: decode, clock, frame, schedule, timing, motion, check, card paint, golden argv, or an HTTP handler. `pnpm test` in `frontend/` is the client check. Add a test for a v1 client behavior or a screen you changed.

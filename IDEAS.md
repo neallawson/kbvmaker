@@ -1375,6 +1375,58 @@ photo and file import, a list-first editor that reads and writes the same
 Montage, and render left on the machines that have ffmpeg. A later
 AVFoundation renderer is what would make **Render video** honest on the phone.
 
+## Build - Windows
+
+GitHub Actions is still the way to ship Windows binaries. You do not need a
+Windows machine for it.
+
+`kbvmaker.exe` is ordinary Go. `kbvmaker-gui.exe` is Wails and needs a real
+Windows toolchain, so it is built on a `windows-latest` runner with
+`scripts/build.ps1`. ffmpeg stays on the user's PATH. The runner skips that
+check, because compiling the programs does not run ffmpeg.
+
+The workflow is in `.github/workflows/windows.yml`. It installs Go 1.23 and
+Node 22, builds both executables, and packs them with a short note into
+`kbvmaker-windows-amd64.zip`.
+
+- Pushing a tag shaped like `v1.0.0` publishes that zip on the GitHub release
+  for the tag.
+- Running the workflow by hand from the Actions tab builds the same zip and
+  keeps it as an artifact, with no release. That is the way to try the job
+  before the first tag.
+
+The workflow file has to be on the commit you tag. After you commit and push
+these changes:
+
+```
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The release then appears on https://github.com/neallawson/kbvmaker/releases.
+I have not committed or pushed this.
+
+## Future Zoom/Pan Enhancements
+
+Two controls, both already resolved by the engine. The seven named moves stay
+the presets. The window today only assigns those moves.
+
+**How far.** A picture can say how far its move zooms. That amount is
+`zoomSpan`. For a move that travels the whole picture, the end zoom is
+`min(fill, 1 + zoomSpan)`. The pace stays coupled to the picture's length, so
+a long picture and a short one move at the same speed and stop when the photo
+fills the frame, or at `1 + zoomSpan` when that is nearer. The project default
+`0.4` is an end near `1.4`, capped by `fill`. The document already stores
+`zoomSpan` on the defaults, and a flag can override it for one run. The
+window does not yet offer it on a picture.
+
+**Where it aims.** A picture can name the spot the move travels toward. The
+point is chosen on the full-image preview. The document stores it as the pan
+point it already resolves: a named place (`center`, `left`, `right`, `top`,
+`bottom`, or a corner) or a `u,v` in `0..1`. The preset keeps its name. Slow
+zoom in stays Slow zoom in, aimed at that spot. Direction is the label for
+the two points, not a separate field.
+
 ## Appendix
 
 ### Research into zoom anti-aliasing

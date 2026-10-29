@@ -1,4 +1,10 @@
 # Build kbvmaker-gui on Windows. Linux and macOS use ./scripts/build.
+# -SkipFFmpegCheck is for a build machine that will not run the program.
+# The executable still needs ffmpeg and ffprobe on PATH when it renders.
+param(
+    [switch]$SkipFFmpegCheck
+)
+
 $ErrorActionPreference = "Stop"
 
 if ($env:OS -ne "Windows_NT") {
@@ -10,10 +16,17 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
 $missing = @()
-foreach ($cmd in @("go", "pnpm", "ffmpeg", "ffprobe")) {
+$cmds = @("go", "pnpm")
+if (-not $SkipFFmpegCheck) {
+    $cmds += @("ffmpeg", "ffprobe")
+}
+foreach ($cmd in $cmds) {
     if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
         $missing += $cmd
     }
+}
+if ($SkipFFmpegCheck) {
+    Write-Host "ffmpeg was not checked. Rendering still needs ffmpeg and ffprobe on PATH."
 }
 if ($missing.Count -gt 0) {
     Write-Host ("Missing programs: " + ($missing -join ", ") + ".")

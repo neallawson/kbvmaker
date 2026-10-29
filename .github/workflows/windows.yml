@@ -1,0 +1,85 @@
+# A tag v1.2.3 publishes kbvmaker-windows-amd64.zip on that GitHub release.
+# workflow_dispatch builds the same zip and keeps it as an Actions artifact.
+name: Windows executables
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Build the editor
+        shell: pwsh
+        run: ./scripts/build.ps1 -SkipFFmpegCheck
+
+      - name: Build the command line
+        shell: pwsh
+        run: go build -o kbvmaker.exe ./cmd/kbvmaker
+
+      - name: Pack the zip
+        shell: pwsh
+        run: |
+          @'
+          kbvmaker for Windows (64-bit)
+
+          kbvmaker.exe is the command line.
+          kbvmaker-gui.exe is the editor.
+
+          Rendering needs ffmpeg and ffprobe on PATH.
+          The editor uses the WebView2 runtime that current Windows 10 and Windows 11 already include.
+          '@ | Set-Content -Encoding utf8 WINDOWS.txt
+          Compress-Archive -Path kbvmaker.exe, kbvmaker-gui.exe, WINDOWS.txt -DestinationPath kbvmaker-windows-amd64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kbvmaker-windows-amd64
+          path: kbvmaker-windows-amd64.zip
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $tag = "${{ github.ref_name }}"
+          @'
+          Windows 64-bit executables.
+
+          kbvmaker.exe is the command line.
+          kbvmaker-gui.exe is the editor.
+
+          Rendering needs ffmpeg and ffprobe on PATH.
+          The editor uses the WebView2 runtime that current Windows 10 and Windows 11 already include.
+          '@ | Set-Content -Encoding utf8 release-notes.txt
+          gh release view $tag
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag kbvmaker-windows-amd64.zip --clobber
+          } else {
+            gh release create $tag kbvmaker-windows-amd64.zip --title $tag --notes-file release-notes.txt
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

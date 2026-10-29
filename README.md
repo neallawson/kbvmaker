@@ -26,7 +26,7 @@ Where `IDEAS.md` and `montage-v1.md` disagree, the specification wins.
 
 ## Install
 
-Prebuilt downloads are not published yet. Build the command line or the GUI from source.
+Pushing a tag such as `v1.0.0` runs the Windows build and attaches `kbvmaker-windows-amd64.zip` to that GitHub release. The zip contains `kbvmaker.exe` and `kbvmaker-gui.exe`. Rendering needs `ffmpeg` and `ffprobe` on `PATH`. The editor uses the WebView2 runtime that current Windows 10 and Windows 11 already include. Linux and macOS are built from source.
 
 The command line needs [Go 1.23](https://go.dev/dl/) or newer, plus `ffmpeg` and `ffprobe` on `PATH`. `go test ./...` skips the short render when ffmpeg is absent. The GUI needs those and a few more tools. `./scripts/build` checks for them and, on Linux, uses the WebKitGTK library that is already installed.
 
