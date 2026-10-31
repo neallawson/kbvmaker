@@ -88,14 +88,14 @@ describe('Editor', () => {
 		expect(buttons?.textContent).toContain('Unsaved changes');
 		expect(screen.getByRole('button', { name: 'Classic' }).getAttribute('aria-pressed')).toBe('true');
 		const title = screen.getByRole('heading', { level: 1 });
-		for (const heading of [title, screen.getByRole('heading', { name: 'Look' }), screen.getByRole('heading', { name: 'Pictures' }), screen.getByRole('heading', { name: 'Render' })]) {
+		for (const heading of [title, screen.getByRole('heading', { name: 'Look' }), screen.getByRole('heading', { name: 'Pictures' }), screen.getByRole('heading', { name: 'Create Video' })]) {
 			expect(heading.className).not.toContain('border-b');
 		}
 		expect(screen.getByRole('tab', { name: 'Soundtrack', selected: true })).toBeTruthy();
 		expect(screen.getByRole('tab', { name: 'Soundtrack' }).closest('section')?.className).toContain('border-b');
 		expect(title.closest('section')?.className).toContain('border-b');
 		expect(screen.getByRole('heading', { name: 'Pictures' }).closest('section')?.className).toContain('border-b');
-		expect(screen.getByRole('heading', { name: 'Render' }).closest('section')?.className).not.toContain('border-b');
+		expect(screen.getByRole('heading', { name: 'Create Video' }).closest('section')?.className).not.toContain('border-b');
 		expect(screen.getByText('Timeline').className).not.toContain('border-b');
 		expect(screen.getByText('Each picture shows up here as you add it.')).toBeTruthy();
 		expect(document.querySelectorAll('[data-timeline] .film-rail')).toHaveLength(2);
@@ -412,7 +412,7 @@ describe('Editor', () => {
 		expect(last?.slots?.[0].dur).toBeUndefined();
 	});
 
-	it('locks the editor and shows progress beside Render until the video is written', async () => {
+	it('locks the editor and shows progress beside Create Video until the video is written', async () => {
 		const user = userEvent.setup();
 		const api = client({
 			montage: 1,
@@ -429,19 +429,19 @@ describe('Editor', () => {
 		};
 		render(Editor, { client: api.client, host });
 		await user.click(screen.getByRole('button', { name: 'Open' }));
-		const renderVideo = await screen.findByRole('button', { name: 'Render video' });
+		const renderVideo = await screen.findByRole('button', { name: 'Create Video' });
 		await waitFor(() => expect((renderVideo as HTMLButtonElement).disabled).toBe(false));
 		await user.click(renderVideo);
 
 		expect((await screen.findByRole('status')).textContent).toContain('Rendering…');
-		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).matches(':disabled')).toBe(
+		expect((screen.getByRole('button', { name: 'Create Video' }) as HTMLButtonElement).matches(':disabled')).toBe(
 			true
 		);
 		expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).matches(':disabled')).toBe(true);
 
 		finish();
 		expect(await screen.findByText(/Wrote out\.mp4 in 0:0\d/)).toBeTruthy();
-		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).matches(':disabled')).toBe(
+		expect((screen.getByRole('button', { name: 'Create Video' }) as HTMLButtonElement).matches(':disabled')).toBe(
 			false
 		);
 	});
@@ -478,7 +478,7 @@ describe('Editor', () => {
 		};
 		render(Editor, { client: api.client, host });
 		await user.click(screen.getByRole('button', { name: 'Open' }));
-		const renderVideo = await screen.findByRole('button', { name: 'Render video' });
+		const renderVideo = await screen.findByRole('button', { name: 'Create Video' });
 		await waitFor(() => expect((renderVideo as HTMLButtonElement).disabled).toBe(false));
 		holdPlans = true;
 		await user.click(renderVideo);
@@ -515,7 +515,7 @@ describe('Editor', () => {
 		await user.click(screen.getByRole('button', { name: 'Open' }));
 
 		expect((await screen.findByRole('alert')).textContent).toContain('audio song.mp3');
-		const renderVideo = screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement;
+		const renderVideo = screen.getByRole('button', { name: 'Create Video' }) as HTMLButtonElement;
 		const exportScript = screen.getByRole('button', { name: 'Export shell script' }) as HTMLButtonElement;
 		expect(renderVideo.disabled).toBe(true);
 		expect(exportScript.disabled).toBe(true);
@@ -587,7 +587,7 @@ describe('Editor', () => {
 		expect(alert.textContent).toContain('Missing picture 2: b.jpg');
 		expect(alert.textContent).toContain('Missing picture 3: c.jpg');
 		expect(screen.getByRole('heading', { level: 1 }).closest('section')?.contains(alert)).toBe(true);
-		expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).disabled).toBe(true);
+		expect((screen.getByRole('button', { name: 'Create Video' }) as HTMLButtonElement).disabled).toBe(true);
 	});
 
 	it('re-scans images and audio from the button and when the window returns', async () => {
@@ -625,7 +625,7 @@ describe('Editor', () => {
 		await user.click(screen.getByRole('button', { name: 'Re-scan Pictures/Audio' }));
 		await waitFor(() => expect(plans).toBe(2));
 		await waitFor(() => expect(thumbs).toBeGreaterThan(thumbsBefore));
-		await waitFor(() => expect((screen.getByRole('button', { name: 'Render video' }) as HTMLButtonElement).disabled).toBe(false));
+		await waitFor(() => expect((screen.getByRole('button', { name: 'Create Video' }) as HTMLButtonElement).disabled).toBe(false));
 
 		const plansBeforeFocus = plans;
 		window.dispatchEvent(new Event('focus'));
