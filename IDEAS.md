@@ -1406,6 +1406,38 @@ git push origin v1.0.0
 The release then appears on https://github.com/neallawson/kbvmaker/releases.
 I have not committed or pushed this.
 
+## Build - Linux
+
+A Linux release needs a second job on an Ubuntu runner, attached to the same
+tag. The command line is an ordinary Go build. The editor is the part that
+needs extra packages, and it will not be a standalone file the way
+`kbvmaker-gui.exe` is.
+
+`./scripts/build` already produces `kbvmaker-gui` on Linux. On the runner it
+needs Go 1.23, pnpm 8, Node 22, a C compiler, pkg-config, GTK 3, and
+WebKitGTK. The script also refuses to start unless `ffmpeg` and `ffprobe`
+are installed, even though the compile never runs them. Ubuntu's `ffmpeg`
+package supplies both, so the job can install that instead of growing a skip
+flag.
+
+Pin the runner to a specific Ubuntu release, such as `ubuntu-24.04`, rather
+than `ubuntu-latest`. The editor is linked against the WebKitGTK and glibc on
+that machine. A binary built there runs on a machine with those libraries,
+and current Ubuntu 24.04 has WebKitGTK 4.1, which is the one the script
+selects when both 4.1 and 4.0 are present. The zip should say that GTK 3,
+WebKitGTK 4.1, `ffmpeg`, and `ffprobe` have to be installed. `kbvmaker`
+itself does not need WebKitGTK.
+
+The zip would be `kbvmaker-linux-amd64.zip`, containing `kbvmaker`,
+`kbvmaker-gui`, and that note. Upload it to the same GitHub release as
+`kbvmaker-windows-amd64.zip`. The Windows job creates that release, so the
+Linux job has to upload onto the release if it already exists, and create it
+only when it does not. Both jobs can pass the "does this release exist yet"
+check at the same moment, so one of them needs to retry the upload.
+
+The workflow file has to be on the commit you tag. A tag pushed before this
+job exists will publish the Windows zip only.
+
 ## Future Zoom/Pan Enhancements
 
 Two controls, both already resolved by the engine. The seven named moves stay
