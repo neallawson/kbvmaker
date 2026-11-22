@@ -9,12 +9,15 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"kbvmaker/identity"
 	"kbvmaker/v1/version"
 )
 
 func topHelp() string {
 	var b strings.Builder
-	b.WriteString(`kbvmaker makes a Ken Burns video from a Montage document, a song, and photos.
+	b.WriteString(identity.Text())
+	b.WriteString(`
+kbvmaker makes a Ken Burns video from a Montage document, a song, and photos.
 
 Usage:
   kbvmaker COMMAND [flags] FILE|-
@@ -120,10 +123,19 @@ func versionCmd(args []string, e env) int {
 		return report(e.stderr, usagef("usage: kbvmaker version [-json]"), wantsJSON(args))
 	}
 	if *asJSON {
-		b, _ := json.Marshal(map[string]any{"version": buildVersion(), "montage": version.Current, "renderPlan": version.Current})
+		b, _ := json.Marshal(map[string]any{
+			"version":    buildVersion(),
+			"release":    identity.Version(),
+			"copyright":  identity.Current.Copyright,
+			"url":        identity.Current.URL,
+			"built":      identity.Built(),
+			"montage":    version.Current,
+			"renderPlan": version.Current,
+		})
 		fmt.Fprintf(e.stdout, "%s\n", b)
 		return exitOK
 	}
+	fmt.Fprint(e.stdout, identity.Text())
 	fmt.Fprintf(e.stdout, "kbvmaker %s (Montage %d)\n", buildVersion(), version.Current)
 	return exitOK
 }

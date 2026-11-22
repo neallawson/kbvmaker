@@ -10,6 +10,8 @@ The module is `kbvmaker`. Montage 1 is `kbvmaker/v1`.
 
 `v1.Version`, the document field `montage`, and the export field `renderPlan` are `v1/version.Current`. Today that is 1. Reject any other `montage` value from this package.
 
+`identity/identity.json` is the product name, copyright, and URL. The command line and the editor both read that file. The release number is not in the file. A build stamps it from the git tag on that commit (`v1.0.0` from `git tag v1.0.0`) through `KBVM_VERSION` and `-X kbvmaker/identity.release`. An untagged build says `dev`. The same build stamps `KBVM_BUILT` and `-X kbvmaker/identity.built` with the UTC time, including a `dev` build. It is not the Montage number.
+
 A later Montage is a new package (`v2`) that accepts `montage: 2`. Keep `v1` able to load a version-1 document. Do not accept two document versions in one package. `doc` imports `v1/version`, not package `v1`, so the version constant does not cycle.
 
 ## Where logic lives

@@ -14,8 +14,32 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      # A tag push stamps that tag. A hand run leaves this empty, and the
+      # build script uses the tag on HEAD, or dev when HEAD is not tagged.
+      KBVM_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Stamp the release
+        shell: pwsh
+        run: |
+          if (-not $env:KBVM_VERSION) {
+            $tag = git describe --tags --exact-match HEAD 2>$null
+            if ($LASTEXITCODE -eq 0 -and $tag) {
+              $env:KBVM_VERSION = "$tag".Trim()
+            } else {
+              $env:KBVM_VERSION = "dev"
+            }
+          }
+          if (-not $env:KBVM_BUILT) {
+            $env:KBVM_BUILT = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss'Z'")
+          }
+          "KBVM_VERSION=$($env:KBVM_VERSION)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "KBVM_BUILT=$($env:KBVM_BUILT)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Release $($env:KBVM_VERSION), built $($env:KBVM_BUILT)"
 
       - uses: actions/setup-go@v5
         with:
@@ -38,7 +62,7 @@ jobs:
 
       - name: Build the command line
         shell: pwsh
-        run: go build -o kbvmaker.exe ./cmd/kbvmaker
+        run: go build -ldflags "-X kbvmaker/identity.release=$env:KBVM_VERSION -X kbvmaker/identity.built=$env:KBVM_BUILT" -o kbvmaker.exe ./cmd/kbvmaker
 
       - name: Pack the zip
         shell: pwsh

@@ -39,6 +39,18 @@ if (-not (Test-Path "frontend/node_modules")) {
     pnpm --dir frontend install --frozen-lockfile
 }
 
+if (-not $env:KBVM_VERSION) {
+    $tag = git describe --tags --exact-match HEAD 2>$null
+    if ($LASTEXITCODE -eq 0 -and $tag) {
+        $env:KBVM_VERSION = "$tag".Trim()
+    } else {
+        $env:KBVM_VERSION = "dev"
+    }
+}
+if (-not $env:KBVM_BUILT) {
+    $env:KBVM_BUILT = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss'Z'")
+}
+Write-Host "Release $($env:KBVM_VERSION), built $($env:KBVM_BUILT)"
 Write-Host "Using the Windows WebView2 runtime"
 Write-Host "Building the client"
 pnpm --dir frontend build
@@ -48,7 +60,7 @@ if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 Copy-Item -Recurse frontend/build $stage
 try {
     Write-Host "Building kbvmaker-gui.exe"
-    go build -tags production -o kbvmaker-gui.exe ./cmd/desktop
+    go build -tags production -ldflags "-X kbvmaker/identity.release=$($env:KBVM_VERSION) -X kbvmaker/identity.built=$($env:KBVM_BUILT)" -o kbvmaker-gui.exe ./cmd/desktop
     go test -tags production -count=1 -run TestClientBuild ./cmd/desktop
     Write-Host "Built .\kbvmaker-gui.exe"
 } finally {

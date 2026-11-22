@@ -3,6 +3,7 @@
 	import { Button } from '#lib/components/ui/button';
 	import { Card, CardContent } from '#lib/components/ui/card';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs';
+	import { identity, identityLine } from '#lib/identity';
 	import type { Host } from '#lib/platform/host';
 	import { RuleError, type Card as TitleCard, type Client, type MontageFile, type Plan, type Slot } from './client';
 	import {
@@ -1807,6 +1808,10 @@
 		</section>
 	{/if}
 	</fieldset>
+	<footer class="text-muted-foreground text-sm">
+		<p>{identityLine()}</p>
+		<p><a href={identity.url} target="_blank" rel="noopener">{identity.url}</a></p>
+	</footer>
 	{#if previewIndex != null && doc?.slots?.[previewIndex]}
 		{@const preview = doc.slots[previewIndex]}
 		<dialog

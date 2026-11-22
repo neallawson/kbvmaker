@@ -26,7 +26,7 @@ Where `IDEAS.md` and `montage-v1.md` disagree, the specification wins.
 
 ## Install
 
-Pushing a tag such as `v1.0.0` runs the Windows build and attaches `kbvmaker-windows-amd64.zip` to that GitHub release. The zip contains `kbvmaker.exe` and `kbvmaker-gui.exe`. Rendering needs `ffmpeg` and `ffprobe` on `PATH`. The editor uses the WebView2 runtime that current Windows 10 and Windows 11 already include. Linux and macOS are built from source.
+Pushing a tag such as `v1.0.0` runs the Windows build and attaches `kbvmaker-windows-amd64.zip` to that GitHub release. That tag is the version both programs show. The zip contains `kbvmaker.exe` and `kbvmaker-gui.exe`. Rendering needs `ffmpeg` and `ffprobe` on `PATH`. The editor uses the WebView2 runtime that current Windows 10 and Windows 11 already include. Linux and macOS are built from source.
 
 The command line needs [Go 1.23](https://go.dev/dl/) or newer, plus `ffmpeg` and `ffprobe` on `PATH`. `go test ./...` skips the short render when ffmpeg is absent. The GUI needs those and a few more tools. `./scripts/build` checks for them and, on Linux, uses the WebKitGTK library that is already installed.
 
@@ -60,7 +60,7 @@ The script installs frontend dependencies on a fresh checkout, builds the Svelte
 
 ## GUI
 
-kbvmaker-gui is the editor. One screen holds the project, the song, a look, the pictures, and a timeline of how the film will play. The same screens run in a browser. The GUI adds native file dialogs that reopen in the last folder used for that kind of file.
+kbvmaker-gui is the editor. One screen holds the project, the song, a look, the pictures, and a timeline of how the film will play. The same screens run in a browser. The GUI adds native file dialogs that reopen in the last folder used for that kind of file. The bottom of the screen names the release, the copyright, and the project URL.
 
 The browser host types a path into the box instead of opening a dialog:
 

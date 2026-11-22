@@ -96,6 +96,19 @@ if [ ! -d frontend/node_modules ]; then
 	pnpm --dir frontend install --frozen-lockfile
 fi
 
+if [ -z "${KBVM_VERSION:-}" ]; then
+	KBVM_VERSION=$(git describe --tags --exact-match HEAD 2>/dev/null || true)
+	if [ -z "$KBVM_VERSION" ]; then
+		KBVM_VERSION=dev
+	fi
+fi
+export KBVM_VERSION
+if [ -z "${KBVM_BUILT:-}" ]; then
+	KBVM_BUILT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+fi
+export KBVM_BUILT
+printf '%s\n' "Release ${KBVM_VERSION}, built ${KBVM_BUILT}"
+
 printf '%s\n' "Building the client"
 pnpm --dir frontend build
 
@@ -106,6 +119,6 @@ cleanup() { rm -rf "$stage"; }
 trap cleanup EXIT
 
 printf '%s\n' "Building ${out}"
-go build -tags "$tags" -o "$out" ./cmd/desktop
+go build -tags "$tags" -ldflags "-X kbvmaker/identity.release=${KBVM_VERSION} -X kbvmaker/identity.built=${KBVM_BUILT}" -o "$out" ./cmd/desktop
 go test -tags "$tags" -count=1 -run TestClientBuild ./cmd/desktop
 printf '%s\n' "Built ./${out}"

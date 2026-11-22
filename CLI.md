@@ -22,7 +22,7 @@ kbvmaker help render
 | `export-plan FILE` | Compiles the render as `renderPlan` JSON. Title cards add a `files` map of path to base64 PNG. | JSON |
 | `render FILE` | Runs ffmpeg and writes the video. | The video's path |
 | `serve` | Serves `/v1` (and the client with `-static DIR`) until interrupted. | — |
-| `version` | Build and Montage version. | `kbvmaker 9d847d0… (Montage 1)` |
+| `version` | Release identity, then the build and Montage version. | `kbvmaker version v1.0.0, Copyright (c) 2026 Neal Lawson, built 2026-11-22T22:08:05Z` and `https://github.com/neallawson/kbvmaker`, then `kbvmaker 9d847d0… (Montage 1)`. The `v1.0.0` is the git tag this build was stamped with. An untagged build says `dev`. The time is when that build was made, for a tag and for `dev`. |
 
 `FILE` is a Montage document. `-` reads it from stdin; relative paths inside it
 then resolve against `-dir` (default: the current directory). `-dir` with a
@@ -68,7 +68,10 @@ names the stage and includes ffmpeg's output.
 With `-json`, results that are not files are JSON too: `validate` prints
 `{"ok":true}` (with `slots` and `duration` under `--media`), `render` prints
 `{"file":…,"seconds":…}`, and `version` prints
-`{"version":…,"montage":1,"renderPlan":1}`.
+`{"version":…,"release":"v1.0.0","copyright":…,"url":…,"built":"2026-11-22T22:08:05Z","montage":1,"renderPlan":1}`.
+`version` is the build. `release` is the git tag stamped onto that build, or
+`dev` when it was not tagged. `built` is the UTC time of that build.
+`copyright` and `url` come from `identity/identity.json`.
 
 ## Overrides
 

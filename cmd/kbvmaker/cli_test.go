@@ -136,7 +136,7 @@ func TestHelp(t *testing.T) {
 	p := newProject(t)
 	r := p.run(t, "help")
 	expectCode(t, r, exitOK)
-	for _, want := range []string{"validate", "plan", "export-script", "export-plan", "render", "serve", "version", "130"} {
+	for _, want := range []string{"validate", "plan", "export-script", "export-plan", "render", "serve", "version", "130", "Copyright (c) 2026 Neal Lawson", "https://github.com/neallawson/kbvmaker"} {
 		if !strings.Contains(r.stdout, want) {
 			t.Fatalf("help is missing %q:\n%s", want, r.stdout)
 		}
@@ -556,7 +556,7 @@ func TestVersion(t *testing.T) {
 	p := newProject(t)
 	r := p.run(t, "version")
 	expectCode(t, r, exitOK)
-	if !strings.HasPrefix(r.stdout, "kbvmaker ") || !strings.Contains(r.stdout, "(Montage 1)") {
+	if !strings.HasPrefix(r.stdout, "kbvmaker version dev, Copyright (c) 2026 Neal Lawson, built unknown\n") || !strings.Contains(r.stdout, "https://github.com/neallawson/kbvmaker\n") || !strings.Contains(r.stdout, "(Montage 1)") {
 		t.Fatalf("version %q", r.stdout)
 	}
 	r = p.run(t, "--version", "--json")
@@ -565,8 +565,12 @@ func TestVersion(t *testing.T) {
 		Montage    int    `json:"montage"`
 		RenderPlan int    `json:"renderPlan"`
 		Version    string `json:"version"`
+		Release    string `json:"release"`
+		Copyright  string `json:"copyright"`
+		URL        string `json:"url"`
+		Built      string `json:"built"`
 	}
-	if err := json.Unmarshal([]byte(r.stdout), &v); err != nil || v.Montage != 1 || v.RenderPlan != 1 || v.Version == "" {
+	if err := json.Unmarshal([]byte(r.stdout), &v); err != nil || v.Montage != 1 || v.RenderPlan != 1 || v.Version == "" || v.Release != "dev" || v.Copyright != "Copyright (c) 2026 Neal Lawson" || v.URL != "https://github.com/neallawson/kbvmaker" || v.Built != "unknown" {
 		t.Fatalf("version json %q", r.stdout)
 	}
 }

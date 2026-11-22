@@ -97,6 +97,12 @@ describe('Editor', () => {
 		expect(screen.getByRole('heading', { name: 'Pictures' }).closest('section')?.className).toContain('border-b');
 		expect(screen.getByRole('heading', { name: 'Create Video' }).closest('section')?.className).not.toContain('border-b');
 		expect(screen.getByText('Timeline').className).not.toContain('border-b');
+		expect(
+			screen.getByText(/^kbvmaker version dev, Copyright \(c\) 2026 Neal Lawson, built \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
+		).toBeTruthy();
+		expect(screen.getByRole('link', { name: 'https://github.com/neallawson/kbvmaker' }).getAttribute('href')).toBe(
+			'https://github.com/neallawson/kbvmaker'
+		);
 		expect(screen.getByText('Each picture shows up here as you add it.')).toBeTruthy();
 		expect(document.querySelectorAll('[data-timeline] .film-rail')).toHaveLength(2);
 	});
